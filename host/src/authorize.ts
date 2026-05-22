@@ -17,9 +17,9 @@ export function authorizeEffect(manifest: PluginManifest, effect: EffectRequest)
       const url = new URL(effect.url);
       const allowed = manifest.capabilities.some((capability) => {
         return (
-          capability.type === "http.fetch" &&
-          capability.domains.includes(url.hostname) &&
-          capability.methods.includes(effect.method)
+          capability.type === "http.get" &&
+          effect.method === "GET" &&
+          originPolicyAllows(capability.originPolicy, url.hostname)
         );
       });
 
@@ -43,4 +43,16 @@ export function authorizeEffect(manifest: PluginManifest, effect: EffectRequest)
 
   const exhaustive: never = effect;
   throw new Error(`Unsupported effect type ${(exhaustive as { type: string }).type}`);
+}
+
+function originPolicyAllows(
+  policy: Extract<PluginManifest["capabilities"][number], { type: "http.get" }>["originPolicy"],
+  hostname: string,
+): boolean {
+  switch (policy.type) {
+    case "known":
+      return policy.origins.includes(hostname);
+    case "dynamic":
+      return true;
+  }
 }

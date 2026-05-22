@@ -1,37 +1,27 @@
-use patchouli_plugin_api::{
-    export_plugin, BotEvent, Capability, EffectRequest, HttpMethod, TriggerGroup, TriggerSource,
-};
+use patchouli_plugin_api::{export_plugin, BotEvent, Capability, EffectRequest, TriggerGroup};
 
 const PLUGIN_ID: &str = "extra.joke";
 const PLUGIN_VERSION: &str = "0.1.0";
 
 const EVENT_JOKE: &str = "event.joke";
 const COMMAND_NAME: &str = "joke";
+const COMMAND_DESCRIPTION: &str = "Fetch a Chuck Norris joke.";
 const TRIGGER_MESSAGE: &str = "!joke";
 const EFFECT_RESULT_TRIGGER: &str = "effect.result";
 const JOKE_URL: &str = "https://api.chucknorris.io/jokes/random";
+const JOKE_ORIGIN: &str = "api.chucknorris.io";
 
 export_plugin! {
     id: PLUGIN_ID,
     version: PLUGIN_VERSION,
     triggers: [
-        TriggerGroup {
-            event: EVENT_JOKE.to_string(),
-            name: COMMAND_NAME.to_string(),
-            description: "Fetch a Chuck Norris joke.".to_string(),
-            sources: vec![
-                TriggerSource::DiscordSlashCommand { command_name: COMMAND_NAME.to_string() },
-                TriggerSource::DiscordMessage { content: TRIGGER_MESSAGE.to_string() },
-            ],
-        },
+        TriggerGroup::slash(EVENT_JOKE, COMMAND_NAME, COMMAND_DESCRIPTION)
+            .message(TRIGGER_MESSAGE),
     ],
     subscribes: [EFFECT_RESULT_TRIGGER],
     capabilities: [
         Capability::DiscordInteractionReply,
-        Capability::HttpFetch {
-            domains: vec![JOKE_URL.to_string()],
-            methods: vec![HttpMethod::GET],
-        },
+        Capability::http_get(JOKE_ORIGIN),
         Capability::MessageSend,
     ],
     handlers: [
@@ -49,21 +39,19 @@ export_plugin! {
 fn handle_joke_message(event: BotEvent) -> Vec<EffectRequest> {
     match event {
         BotEvent::DiscordInteractionCommand { interaction_id, .. } => {
-            vec![EffectRequest::HttpFetch {
-                id: format!("fetch-joke:interaction:{interaction_id}"),
-                method: HttpMethod::GET,
-                url: JOKE_URL.to_string(),
-            }]
+            vec![EffectRequest::http_get(
+                format!("fetch-joke:interaction:{interaction_id}"),
+                JOKE_URL,
+            )]
         }
         BotEvent::DiscordMessage {
             channel_id,
             content,
             ..
-        } if content.trim() == "!joke" => vec![EffectRequest::HttpFetch {
-            id: format!("fetch-joke:channel:{channel_id}"),
-            method: HttpMethod::GET,
-            url: JOKE_URL.to_string(),
-        }],
+        } if content.trim() == TRIGGER_MESSAGE => vec![EffectRequest::http_get(
+            format!("fetch-joke:channel:{channel_id}"),
+            JOKE_URL,
+        )],
         _ => Vec::new(),
     }
 }
@@ -77,21 +65,19 @@ fn handle_effect_result(event: BotEvent) -> Vec<EffectRequest> {
                 .unwrap_or_else(|| "I could not fetch a joke right now.".to_string());
 
             if let Some(interaction_id) = effect_id.strip_prefix("fetch-joke:interaction:") {
-                return vec![EffectRequest::DiscordInteractionReply {
-                    id: format!("reply-joke:{interaction_id}"),
-                    interaction_id: interaction_id.to_string(),
-                    content: Some(text),
-                    embeds: Vec::new(),
-                    ephemeral: false,
-                }];
+                return vec![EffectRequest::interaction_reply(
+                    format!("reply-joke:{interaction_id}"),
+                    interaction_id,
+                    text,
+                )];
             }
 
             if let Some(channel_id) = effect_id.strip_prefix("fetch-joke:channel:") {
-                return vec![EffectRequest::MessageSend {
-                    id: format!("send-joke:{channel_id}"),
-                    channel_id: channel_id.to_string(),
+                return vec![EffectRequest::message_send(
+                    format!("send-joke:{channel_id}"),
+                    channel_id,
                     text,
-                }];
+                )];
             }
 
             Vec::new()

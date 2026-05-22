@@ -1,6 +1,6 @@
 use patchouli_plugin_api::{
     export_plugin, BotEvent, Capability, DiscordEmbed, DiscordEmbedField, EffectRequest,
-    TriggerGroup, TriggerSource,
+    TriggerGroup,
 };
 
 const PLUGIN_ID: &str = "builtin.status";
@@ -8,19 +8,13 @@ const PLUGIN_VERSION: &str = "0.1.0";
 
 const EVENT_STATUS: &str = "event.status";
 const COMMAND_NAME: &str = "status";
+const COMMAND_DESCRIPTION: &str = "Show Patchouli runtime status.";
 
 export_plugin! {
     id: PLUGIN_ID,
     version: PLUGIN_VERSION,
     triggers: [
-        TriggerGroup {
-            event: EVENT_STATUS.to_string(),
-            name: COMMAND_NAME.to_string(),
-            description: "Show Patchouli runtime status.".to_string(),
-            sources: vec![
-                TriggerSource::DiscordSlashCommand { command_name: COMMAND_NAME.to_string() },
-            ],
-        },
+        TriggerGroup::slash(EVENT_STATUS, COMMAND_NAME, COMMAND_DESCRIPTION),
     ],
     subscribes: [],
     capabilities: [Capability::DiscordInteractionReply],
@@ -45,11 +39,11 @@ fn handle_status(event: BotEvent) -> Vec<EffectRequest> {
                 .collect::<Vec<_>>()
                 .join("\n");
 
-            vec![EffectRequest::DiscordInteractionReply {
-                id: "reply-status".to_string(),
+            vec![EffectRequest::ephemeral_interaction_reply(
+                "reply-status",
                 interaction_id,
-                content: None,
-                embeds: vec![DiscordEmbed {
+                None,
+                vec![DiscordEmbed {
                     title: "Patchouli Status".to_string(),
                     description: "Patchouli is running.".to_string(),
                     fields: vec![
@@ -69,8 +63,7 @@ fn handle_status(event: BotEvent) -> Vec<EffectRequest> {
                         },
                     ],
                 }],
-                ephemeral: true,
-            }]
+            )]
         }
         _ => Vec::new(),
     }

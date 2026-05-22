@@ -2,11 +2,19 @@
 
 export type PluginManifest = { id: string, version: string, triggers: Array<TriggerGroup>, subscribes: Array<string>, capabilities: Array<Capability>, discord: DiscordManifest, };
 
+export type ManifestResult = { "status": "ok", manifest: PluginManifest, } | { "status": "err", error: PluginError, };
+
+export type PlanResult = { "status": "ok", plan: ActionPlan, } | { "status": "err", error: PluginError, };
+
+export type PluginError = { code: string, message: string, };
+
 export type TriggerGroup = { event: string, name: string, description: string, sources: Array<TriggerSource>, };
 
 export type TriggerSource = { "type": "discordSlashCommand", commandName: string, } | { "type": "discordMessage", content: string, };
 
-export type Capability = { "type": "discord.interaction.reply" } | { "type": "http.fetch", domains: Array<string>, methods: Array<HttpMethod>, } | { "type": "message.send" };
+export type Capability = { "type": "discord.interaction.reply" } | { "type": "http.get", originPolicy: HttpOriginPolicy, } | { "type": "message.send" };
+
+export type HttpOriginPolicy = { "type": "known", origins: Array<string>, } | { "type": "dynamic" };
 
 export type HttpMethod = "GET" | "POST";
 

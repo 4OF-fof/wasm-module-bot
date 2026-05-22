@@ -6,11 +6,39 @@ import type {
   DiscordManifest,
   EffectRequest,
   HttpMethod,
+  HttpOriginPolicy,
+  ManifestResult,
+  PlanResult,
+  PluginError,
   PluginManifest,
   SlashCommand,
   TriggerGroup,
   TriggerSource,
 } from "./generated/plugin-api.js";
+
+export function parseManifestResult(value: unknown): PluginManifest {
+  if (!isManifestResult(value)) {
+    throw new Error("WASM plugin returned an invalid manifest result");
+  }
+
+  if (value.status === "err") {
+    throw new Error(`WASM plugin manifest failed: ${value.error.code}: ${value.error.message}`);
+  }
+
+  return value.manifest;
+}
+
+export function parsePlanResult(value: unknown): ActionPlan {
+  if (!isPlanResult(value)) {
+    throw new Error("WASM plugin returned an invalid plan result");
+  }
+
+  if (value.status === "err") {
+    throw new Error(`WASM plugin plan failed: ${value.error.code}: ${value.error.message}`);
+  }
+
+  return parseActionPlan(value.plan);
+}
 
 export function parsePluginManifest(value: unknown): PluginManifest {
   if (!isPluginManifest(value)) {
@@ -37,6 +65,40 @@ function isPluginManifest(value: unknown): value is PluginManifest {
     isArrayOf(value.capabilities, isCapability) &&
     isDiscordManifest(value.discord)
   );
+}
+
+function isManifestResult(value: unknown): value is ManifestResult {
+  if (!isRecord(value) || !isString(value.status)) {
+    return false;
+  }
+
+  switch (value.status) {
+    case "ok":
+      return isPluginManifest(value.manifest);
+    case "err":
+      return isPluginError(value.error);
+    default:
+      return false;
+  }
+}
+
+function isPlanResult(value: unknown): value is PlanResult {
+  if (!isRecord(value) || !isString(value.status)) {
+    return false;
+  }
+
+  switch (value.status) {
+    case "ok":
+      return normalizeActionPlan(value.plan) !== undefined;
+    case "err":
+      return isPluginError(value.error);
+    default:
+      return false;
+  }
+}
+
+function isPluginError(value: unknown): value is PluginError {
+  return isRecord(value) && isString(value.code) && isString(value.message);
 }
 
 function isTriggerGroup(value: unknown): value is TriggerGroup {
@@ -73,8 +135,23 @@ function isCapability(value: unknown): value is Capability {
     case "discord.interaction.reply":
     case "message.send":
       return true;
-    case "http.fetch":
-      return isArrayOf(value.domains, isString) && isArrayOf(value.methods, isHttpMethod);
+    case "http.get":
+      return isHttpOriginPolicy(value.originPolicy);
+    default:
+      return false;
+  }
+}
+
+function isHttpOriginPolicy(value: unknown): value is HttpOriginPolicy {
+  if (!isRecord(value) || !isString(value.type)) {
+    return false;
+  }
+
+  switch (value.type) {
+    case "known":
+      return isArrayOf(value.origins, isString);
+    case "dynamic":
+      return true;
     default:
       return false;
   }

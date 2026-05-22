@@ -2,8 +2,8 @@ use std::{fs, path::PathBuf};
 
 use patchouli_plugin_api::{
     ActionPlan, BotEvent, Capability, DiscordEmbed, DiscordEmbedField, DiscordManifest,
-    EffectRequest, EffectResult, HttpMethod, PluginManifest, PluginModuleInfo, SlashCommand,
-    TriggerGroup, TriggerSource,
+    EffectRequest, EffectResult, HttpMethod, HttpOriginPolicy, ManifestResult, PlanResult,
+    PluginError, PluginManifest, PluginModuleInfo, SlashCommand, TriggerGroup, TriggerSource,
 };
 use ts_rs::{Config, TS};
 
@@ -13,9 +13,13 @@ fn main() {
     let output = [
         HEADER.to_string(),
         declaration::<PluginManifest>(),
+        declaration::<ManifestResult>(),
+        declaration::<PlanResult>(),
+        declaration::<PluginError>(),
         declaration::<TriggerGroup>(),
         declaration::<TriggerSource>(),
         declaration::<Capability>(),
+        declaration::<HttpOriginPolicy>(),
         declaration::<HttpMethod>(),
         declaration::<DiscordManifest>(),
         declaration::<SlashCommand>(),

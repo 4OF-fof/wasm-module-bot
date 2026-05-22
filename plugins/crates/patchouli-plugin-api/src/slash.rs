@@ -1,7 +1,8 @@
+use crate::capability::Capability;
 use crate::codec::decode_event;
 use crate::types::{
-    ActionPlan, BotEvent, Capability, DiscordManifest, EffectRequest, PluginManifest, SlashCommand,
-    TriggerGroup, TriggerSource,
+    ActionPlan, BotEvent, DiscordManifest, EffectRequest, ManifestResult, PlanResult, PluginError,
+    PluginManifest, SlashCommand, TriggerGroup, TriggerSource,
 };
 
 pub type PluginEventHandler = fn(BotEvent) -> Vec<EffectRequest>;
@@ -27,6 +28,18 @@ pub fn manifest_for(
         discord: DiscordManifest {
             slash_commands: collect_slash_commands(triggers),
         },
+    }
+}
+
+pub fn manifest_result_for(
+    id: &'static str,
+    version: &'static str,
+    triggers: &[TriggerGroup],
+    subscribes: &'static [&'static str],
+    capabilities: &[Capability],
+) -> ManifestResult {
+    ManifestResult::Ok {
+        manifest: manifest_for(id, version, triggers, subscribes, capabilities),
     }
 }
 
@@ -74,20 +87,39 @@ fn push_unique(values: &mut Vec<String>, value: &str) {
     }
 }
 
-pub fn plan_for(input: &[u8], handlers: &'static [PluginHandlerDefinition]) -> ActionPlan {
-    let effects = match decode_event(input) {
-        Ok(event) => {
-            let handler = event_trigger(&event)
-                .and_then(|trigger| handlers.iter().find(|handler| handler.event == trigger));
-
-            handler
-                .map(|handler| (handler.handle)(event))
-                .unwrap_or_default()
+pub fn plan_for(input: &[u8], handlers: &'static [PluginHandlerDefinition]) -> PlanResult {
+    let event = match decode_event(input) {
+        Ok(event) => event,
+        Err(error) => {
+            return PlanResult::Err {
+                error: PluginError::new(
+                    "invalid_event",
+                    format!("failed to decode bot event: {error}"),
+                ),
+            }
         }
-        _ => Vec::new(),
     };
 
-    ActionPlan { effects }
+    let Some(trigger) = event_trigger(&event) else {
+        return PlanResult::Err {
+            error: PluginError::new("missing_trigger", "bot event did not include a trigger"),
+        };
+    };
+
+    let Some(handler) = handlers.iter().find(|handler| handler.event == trigger) else {
+        return PlanResult::Err {
+            error: PluginError::new(
+                "handler_not_found",
+                format!("no plugin handler registered for trigger '{trigger}'"),
+            ),
+        };
+    };
+
+    PlanResult::Ok {
+        plan: ActionPlan {
+            effects: (handler.handle)(event),
+        },
+    }
 }
 
 fn event_trigger(event: &BotEvent) -> Option<&str> {

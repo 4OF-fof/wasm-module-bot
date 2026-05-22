@@ -4,7 +4,7 @@ import type {
   PluginManifest,
 } from "./generated/plugin-api.js";
 import type { ActionPlan } from "./generated/plugin-api.js";
-import { parseActionPlan, parsePluginManifest } from "./plugin-api-validation.js";
+import { parseManifestResult, parsePlanResult } from "./plugin-api-validation.js";
 
 type WasmExports = {
   memory: WebAssembly.Memory;
@@ -31,7 +31,7 @@ export class WasmPlugin {
   }
 
   getManifest(): PluginManifest {
-    return parsePluginManifest(this.readReturnedJson(this.exports.manifest()));
+    return parseManifestResult(this.readReturnedJson(this.exports.manifest()));
   }
 
   plan(event: BotEvent): ActionPlan {
@@ -40,7 +40,7 @@ export class WasmPlugin {
     new Uint8Array(this.exports.memory.buffer, ptr, input.length).set(input);
 
     try {
-      return parseActionPlan(this.readReturnedJson(this.exports.plan(ptr, input.length)));
+      return parsePlanResult(this.readReturnedJson(this.exports.plan(ptr, input.length)));
     } finally {
       this.exports.dealloc(ptr, input.length);
     }

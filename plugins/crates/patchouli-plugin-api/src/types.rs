@@ -1,3 +1,4 @@
+use crate::capability::{Capability, HttpMethod};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
@@ -12,6 +13,39 @@ pub struct PluginManifest {
     pub discord: DiscordManifest,
 }
 
+#[derive(Serialize)]
+#[cfg_attr(feature = "ts-export", derive(ts_rs::TS))]
+#[serde(tag = "status", rename_all = "camelCase")]
+pub enum ManifestResult {
+    Ok { manifest: PluginManifest },
+    Err { error: PluginError },
+}
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "ts-export", derive(ts_rs::TS))]
+#[serde(tag = "status", rename_all = "camelCase")]
+pub enum PlanResult {
+    Ok { plan: ActionPlan },
+    Err { error: PluginError },
+}
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "ts-export", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct PluginError {
+    pub code: String,
+    pub message: String,
+}
+
+impl PluginError {
+    pub fn new(code: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            code: code.into(),
+            message: message.into(),
+        }
+    }
+}
+
 #[derive(Clone, Serialize)]
 #[cfg_attr(feature = "ts-export", derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
@@ -22,6 +56,29 @@ pub struct TriggerGroup {
     pub sources: Vec<TriggerSource>,
 }
 
+impl TriggerGroup {
+    pub fn slash(
+        event: impl Into<String>,
+        name: impl Into<String>,
+        description: impl Into<String>,
+    ) -> Self {
+        let name = name.into();
+        Self {
+            event: event.into(),
+            name: name.clone(),
+            description: description.into(),
+            sources: vec![TriggerSource::DiscordSlashCommand { command_name: name }],
+        }
+    }
+
+    pub fn message(mut self, content: impl Into<String>) -> Self {
+        self.sources.push(TriggerSource::DiscordMessage {
+            content: content.into(),
+        });
+        self
+    }
+}
+
 #[derive(Clone, Serialize)]
 #[cfg_attr(feature = "ts-export", derive(ts_rs::TS))]
 #[serde(tag = "type")]
@@ -30,29 +87,6 @@ pub enum TriggerSource {
     DiscordSlashCommand { command_name: String },
     #[serde(rename = "discordMessage", rename_all = "camelCase")]
     DiscordMessage { content: String },
-}
-
-#[derive(Clone, Serialize)]
-#[cfg_attr(feature = "ts-export", derive(ts_rs::TS))]
-#[serde(tag = "type")]
-pub enum Capability {
-    #[serde(rename = "discord.interaction.reply")]
-    DiscordInteractionReply,
-    #[serde(rename = "http.fetch", rename_all = "camelCase")]
-    HttpFetch {
-        domains: Vec<String>,
-        methods: Vec<HttpMethod>,
-    },
-    #[serde(rename = "message.send")]
-    MessageSend,
-    // TODO: Add state.read and state.write when the host gains a state store.
-}
-
-#[derive(Clone, Copy, Deserialize, Serialize)]
-#[cfg_attr(feature = "ts-export", derive(ts_rs::TS))]
-pub enum HttpMethod {
-    GET,
-    POST,
 }
 
 #[derive(Serialize)]
@@ -134,6 +168,65 @@ pub enum EffectRequest {
         text: String,
     },
     // TODO: Add state.write when the host can authorize and persist state.
+}
+
+impl EffectRequest {
+    pub fn id(&self) -> &str {
+        match self {
+            Self::DiscordInteractionReply { id, .. } => id,
+            Self::HttpFetch { id, .. } => id,
+            Self::MessageSend { id, .. } => id,
+        }
+    }
+
+    pub fn interaction_reply(
+        id: impl Into<String>,
+        interaction_id: impl Into<String>,
+        content: impl Into<String>,
+    ) -> Self {
+        Self::DiscordInteractionReply {
+            id: id.into(),
+            interaction_id: interaction_id.into(),
+            content: Some(content.into()),
+            embeds: Vec::new(),
+            ephemeral: false,
+        }
+    }
+
+    pub fn ephemeral_interaction_reply(
+        id: impl Into<String>,
+        interaction_id: impl Into<String>,
+        content: Option<String>,
+        embeds: Vec<DiscordEmbed>,
+    ) -> Self {
+        Self::DiscordInteractionReply {
+            id: id.into(),
+            interaction_id: interaction_id.into(),
+            content,
+            embeds,
+            ephemeral: true,
+        }
+    }
+
+    pub fn http_get(id: impl Into<String>, url: impl Into<String>) -> Self {
+        Self::HttpFetch {
+            id: id.into(),
+            method: HttpMethod::GET,
+            url: url.into(),
+        }
+    }
+
+    pub fn message_send(
+        id: impl Into<String>,
+        channel_id: impl Into<String>,
+        text: impl Into<String>,
+    ) -> Self {
+        Self::MessageSend {
+            id: id.into(),
+            channel_id: channel_id.into(),
+            text: text.into(),
+        }
+    }
 }
 
 #[derive(Serialize)]

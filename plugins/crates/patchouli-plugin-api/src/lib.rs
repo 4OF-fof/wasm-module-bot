@@ -1,16 +1,20 @@
+mod capability;
 mod codec;
 mod slash;
-mod types;
+pub mod types;
 mod wasm_abi;
 
-pub use codec::{decode_event, encode_json};
+pub use capability::{Capability, HttpMethod, HttpOriginPolicy};
 pub use serde::Serialize;
-pub use slash::{manifest_for, plan_for, PluginEventHandler, PluginHandlerDefinition};
-pub use types::{
-    ActionPlan, BotEvent, Capability, DiscordEmbed, DiscordEmbedField, DiscordManifest,
-    EffectRequest, EffectResult, HttpMethod, PluginManifest, PluginModuleInfo, SlashCommand,
-    TriggerGroup, TriggerSource,
+pub use slash::{
+    manifest_for, manifest_result_for, plan_for, PluginEventHandler, PluginHandlerDefinition,
 };
+pub use types::{
+    ActionPlan, BotEvent, DiscordEmbed, DiscordEmbedField, DiscordManifest, EffectRequest,
+    EffectResult, ManifestResult, PlanResult, PluginError, PluginManifest, PluginModuleInfo,
+    SlashCommand, TriggerGroup, TriggerSource,
+};
+#[doc(hidden)]
 pub use wasm_abi::{alloc_buffer, dealloc_buffer, return_value};
 
 #[macro_export]
@@ -53,7 +57,7 @@ macro_rules! export_plugin {
 
         #[no_mangle]
         pub extern "C" fn manifest() -> u64 {
-            $crate::return_value(&$crate::manifest_for(
+            $crate::return_value(&$crate::manifest_result_for(
                 $id,
                 $version,
                 &[$($trigger),*],
