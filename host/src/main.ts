@@ -177,8 +177,7 @@ async function registerSlashCommands(client: Client<true>): Promise<void> {
   await client.rest.put(Routes.applicationGuildCommands(client.application.id, guildId), {
     body: commands,
   });
-  await client.application.commands.set([]);
-  console.log(`Registered slash commands for guild ${guildId} and cleared global commands.`);
+  console.log(`Registered slash commands for guild ${guildId}.`);
 }
 
 function refreshEnabledPlugins(): void {
