@@ -5,6 +5,8 @@ use patchouli_plugin_api::{
 
 const PLUGIN_ID: &str = "builtin.status";
 const PLUGIN_VERSION: &str = "0.1.0";
+
+const EVENT_STATUS: &str = "event.status";
 const COMMAND_NAME: &str = "status";
 
 export_plugin! {
@@ -12,7 +14,7 @@ export_plugin! {
     version: PLUGIN_VERSION,
     triggers: [
         TriggerGroup {
-            event: "slash.status".to_string(),
+            event: EVENT_STATUS.to_string(),
             name: COMMAND_NAME.to_string(),
             description: "Show Patchouli runtime status.".to_string(),
             sources: vec![
@@ -24,7 +26,7 @@ export_plugin! {
     capabilities: [Capability::DiscordInteractionReply],
     handlers: [
         {
-            event: "slash.status",
+            event: EVENT_STATUS,
             handle: handle_status,
         },
     ],

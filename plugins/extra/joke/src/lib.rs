@@ -4,8 +4,10 @@ use patchouli_plugin_api::{
 
 const PLUGIN_ID: &str = "extra.joke";
 const PLUGIN_VERSION: &str = "0.1.0";
-const JOKE_TRIGGER: &str = "joke";
-const JOKE_COMMAND_NAME: &str = "joke";
+
+const EVENT_JOKE: &str = "event.joke";
+const COMMAND_NAME: &str = "joke";
+const TRIGGER_MESSAGE: &str = "!joke";
 const EFFECT_RESULT_TRIGGER: &str = "effect.result";
 const JOKE_URL: &str = "https://api.chucknorris.io/jokes/random";
 
@@ -14,12 +16,12 @@ export_plugin! {
     version: PLUGIN_VERSION,
     triggers: [
         TriggerGroup {
-            event: JOKE_TRIGGER.to_string(),
-            name: JOKE_COMMAND_NAME.to_string(),
+            event: EVENT_JOKE.to_string(),
+            name: COMMAND_NAME.to_string(),
             description: "Fetch a Chuck Norris joke.".to_string(),
             sources: vec![
-                TriggerSource::DiscordSlashCommand { command_name: JOKE_COMMAND_NAME.to_string() },
-                TriggerSource::DiscordMessage { content: "!joke".to_string() },
+                TriggerSource::DiscordSlashCommand { command_name: COMMAND_NAME.to_string() },
+                TriggerSource::DiscordMessage { content: TRIGGER_MESSAGE.to_string() },
             ],
         },
     ],
@@ -27,14 +29,14 @@ export_plugin! {
     capabilities: [
         Capability::DiscordInteractionReply,
         Capability::HttpFetch {
-            domains: vec!["api.chucknorris.io".to_string()],
+            domains: vec![JOKE_URL.to_string()],
             methods: vec![HttpMethod::GET],
         },
         Capability::MessageSend,
     ],
     handlers: [
         {
-            event: JOKE_TRIGGER,
+            event: EVENT_JOKE,
             handle: handle_joke_message,
         },
         {
