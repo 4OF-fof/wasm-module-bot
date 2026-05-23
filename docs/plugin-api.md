@@ -1,0 +1,133 @@
+# Patchouli plugin API 仕様
+
+この文書は、`patchouli-plugin-api` Rust crate が提供し、TypeScript host が消費する
+plugin API の仕様です。
+
+実装上の正は Rust の型定義です。TypeScript 側の API 型は次の command で Rust crate から
+生成します。
+
+```sh
+cargo run --manifest-path plugins/crates/patchouli-plugin-api/Cargo.toml --features ts-export --bin export_ts
+```
+
+## manifest
+
+すべての plugin は `manifest()` から `PluginManifest` を返します。
+
+| field | 内容 |
+| --- | --- |
+| `id` | 一意で安定した plugin id。例: `builtin.status`, `extra.joke`。 |
+| `version` | plugin version 文字列。 |
+| `triggers` | plugin 処理を開始できる外部入力。 |
+| `subscribes` | 初期 trigger 後に plugin が受け取る event trigger。trigger event は自動で merge される。 |
+| `capabilities` | host がこの plugin に許可できる effect の宣言。 |
+| `discord.slashCommands` | trigger group から生成された slash command 一覧。 |
+
+通常は `export_plugin!` macro を使って manifest と必要な WASM export を生成します。
+
+## trigger
+
+`TriggerGroup` は、1 つの内部 event 名を 1 つ以上の外部 source に対応づけます。
+
+```rust
+TriggerGroup::slash("event.joke", "joke", "Fetch a joke.")
+    .message("!joke")
+```
+
+この例では次を宣言します。
+
+- Discord slash command `/joke`
+- trim 後の message content が `!joke` と完全一致する Discord message trigger
+- plugin 内部で使う event trigger `event.joke`
+
+source が一致すると、host は `trigger` field に内部 event 名を入れた `BotEvent` を plugin に渡します。
+
+## event
+
+plugin は `BotEvent` を処理します。
+
+| event type | 配信タイミング | 主な field |
+| --- | --- | --- |
+| `discord.interaction.command` | slash command source が一致したとき。 | `trigger`, `interactionId`, `modules` |
+| `discord.message` | message source が一致したとき。 | `trigger`, `channelId`, `content` |
+| `effect.result` | 以前の effect が完了し、plugin が `effect.result` を subscribe しているとき。 | `trigger`, `effectId`, `result` |
+
+`modules` には、現在有効な plugin の id と version が入ります。`builtin.status` のような plugin は、
+host へ直接問い合わせずに loaded module 一覧を表示できます。
+
+## effect と action plan
+
+plugin handler は `Vec<EffectRequest>` を返します。API macro がこれを `ActionPlan` に包みます。
+
+host が現在実行できる effect は次の通りです。
+
+| effect type | Rust helper | 必要な capability | 内容 |
+| --- | --- | --- | --- |
+| `discord.interaction.reply` | `EffectRequest::interaction_reply` / `EffectRequest::ephemeral_interaction_reply` | `Capability::DiscordInteractionReply` | 現在の Discord interaction に reply する。 |
+| `http.fetch` | `EffectRequest::http_get` | `Capability::http_get(...)` | HTTP GET request を実行し、結果を `effect.result` で返す。 |
+| `message.send` | `EffectRequest::message_send` | `Capability::MessageSend` | Discord text channel に plain text message を送る。 |
+
+すべての effect には `id` が必要です。後続の `effect.result` を routing できるよう、
+用途と target を含む id にしてください。例: `fetch-joke:interaction:{interaction_id}`。
+
+## capability 一覧
+
+capability は manifest の `capabilities` に宣言し、host が effect 実行前に検査します。
+
+```rust
+capabilities: [
+    Capability::DiscordInteractionReply,
+    Capability::http_get("api.example.com"),
+    Capability::MessageSend,
+],
+```
+
+| Rust API | manifest type | 許可される effect | 認可条件 |
+| --- | --- | --- | --- |
+| `Capability::DiscordInteractionReply` | `discord.interaction.reply` | `discord.interaction.reply` | 現在処理中の interaction id への reply のみ許可。 |
+| `Capability::http_get("hostname")` | `http.get` | `http.fetch` | method が `GET` で、URL hostname が指定 hostname と一致する場合のみ許可。 |
+| `Capability::HttpGet { origin_policy: HttpOriginPolicy::Known { origins } }` | `http.get` | `http.fetch` | method が `GET` で、URL hostname が `origins` に含まれる場合のみ許可。 |
+| `Capability::HttpGet { origin_policy: HttpOriginPolicy::Dynamic }` | `http.get` | `http.fetch` | method が `GET` なら任意 hostname を許可。必要な場合だけ使う。 |
+| `Capability::MessageSend` | `message.send` | `message.send` | text channel target に対する message send を許可。 |
+
+現在の host は URL の full origin ではなく hostname だけを見ます。そのため、known origin は
+`https://api.example.com` ではなく `api.example.com` のように hostname で書きます。
+
+## host 提供 API と effect result
+
+plugin から見ると、host が提供する API は直接呼び出しではなく effect request です。
+
+| host 機能 | plugin からの使い方 | result |
+| --- | --- | --- |
+| Discord interaction reply | `discord.interaction.reply` effect を返す。 | 成功時に `ok: true`, `status: 200`, `body: ""` の `effect.result`。 |
+| Discord message send | `message.send` effect を返す。 | 成功時に `ok: true`, `status: 200`, `body: ""` の `effect.result`。 |
+| HTTP GET | `http.fetch` effect を返す。 | HTTP response の `ok`, `status`, response text が `body` に入る。 |
+| 有効 module 情報 | `discord.interaction.command` event の `modules` を読む。 | effect ではなく event field として提供される。 |
+
+`effect.result` の payload は共通で `{ ok, status, body }` です。HTTP response body の JSON parse や
+error handling は plugin 側で行います。
+
+## error result
+
+crate は `manifest()` または `plan()` から構造化 error を返せます。
+
+```json
+{
+  "status": "err",
+  "error": {
+    "code": "handler_not_found",
+    "message": "no plugin handler registered for trigger 'event.x'"
+  }
+}
+```
+
+host は manifest error と plan error を実行失敗として扱います。通常の plugin logic では、
+処理対象ではない event に対して `Vec::new()` を返してください。
+
+## 現在の制限
+
+- slash command option はまだ plugin に渡していません。
+- message trigger は trim 後の完全一致です。
+- shared `HttpMethod` enum には `POST` もありますが、host の認可は現在 `GET` のみです。
+- state read/write effect は未実装です。
+- effect result は汎用の `{ ok, status, body }` です。response body の解釈は plugin が行います。
