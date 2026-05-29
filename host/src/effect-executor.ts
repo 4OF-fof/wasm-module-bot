@@ -25,13 +25,53 @@ export async function executeEffects(
   effects: EffectRequest[],
 ): Promise<BotEvent[]> {
   const resultEvents: BotEvent[] = [];
+  let discordErrorSent = false;
 
   for (const effect of effects) {
-    authorizeEffect(manifest, effect);
-    resultEvents.push(await executeEffect(effect, target, manifest.id));
+    try {
+      authorizeEffect(manifest, effect);
+      resultEvents.push(await executeEffect(effect, target, manifest.id));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[${manifest.id}] Effect execution error: ${message}`);
+
+      // Send only one Discord error message per executeEffects call to avoid
+      // duplicate messages when a failing effect causes subsequent effects to fail.
+      if (!discordErrorSent) {
+        discordErrorSent = true;
+        await sendErrorToDiscord(
+          target,
+          `Plugin \`${manifest.id}\` でエラーが発生しました: ${message}`,
+        );
+      }
+
+      resultEvents.push(
+        effectResultEvent(manifest.id, effect.id, {
+          ok: false,
+          status: 0,
+          body: message,
+        }),
+      );
+    }
   }
 
   return resultEvents;
+}
+
+export async function sendErrorToDiscord(target: EffectTarget, message: string): Promise<void> {
+  try {
+    if ("reply" in target) {
+      if (target.replied || target.deferred) {
+        await target.followUp({ content: message, flags: MessageFlags.Ephemeral });
+      } else {
+        await target.reply({ content: message, flags: MessageFlags.Ephemeral });
+      }
+    } else if ("send" in target) {
+      await target.send(message);
+    }
+  } catch (sendError) {
+    console.error("Failed to send error message to Discord:", sendError);
+  }
 }
 
 async function executeEffect(
@@ -93,11 +133,19 @@ async function executeInteractionReply(
     throw new Error(`Effect targets unexpected interaction ${effect.interactionId}`);
   }
 
-  await target.reply({
-    content: effect.content ?? undefined,
-    embeds: effect.embeds,
-    flags: effect.ephemeral ? MessageFlags.Ephemeral : undefined,
-  });
+  if (target.replied || target.deferred) {
+    await target.followUp({
+      content: effect.content ?? undefined,
+      embeds: effect.embeds,
+      flags: effect.ephemeral ? MessageFlags.Ephemeral : undefined,
+    });
+  } else {
+    await target.reply({
+      content: effect.content ?? undefined,
+      embeds: effect.embeds,
+      flags: effect.ephemeral ? MessageFlags.Ephemeral : undefined,
+    });
+  }
 
   return effectResultEvent(pluginId, effect.id, {
     ok: true,

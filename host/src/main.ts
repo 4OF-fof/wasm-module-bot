@@ -1,5 +1,5 @@
 import { Client, Events, GatewayIntentBits, Routes } from "discord.js";
-import { executeEffects, type EffectTarget } from "./effect-executor.js";
+import { executeEffects, sendErrorToDiscord, type EffectTarget } from "./effect-executor.js";
 import type { BotEvent } from "./generated/plugin-api.js";
 import { handleModuleButton, handleModuleCommand, moduleCommand } from "./module-command.js";
 import {
@@ -139,8 +139,21 @@ async function runPluginLoop(
       break;
     }
     step += 1;
-    const plan = loadedPlugin.plugin.plan(event);
-    const nextEvents = await executeEffects(loadedPlugin.manifest, target, plan.effects);
+
+    let nextEvents: BotEvent[] = [];
+    try {
+      const plan = loadedPlugin.plugin.plan(event);
+      nextEvents = await executeEffects(loadedPlugin.manifest, target, plan.effects);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[${loadedPlugin.manifest.id}] Plugin loop error: ${message}`);
+      await sendErrorToDiscord(
+        target,
+        `Plugin \`${loadedPlugin.manifest.id}\` で予期しないエラーが発生しました: ${message}`,
+      );
+      continue;
+    }
+
     eventQueue.push(
       ...nextEvents.filter((nextEvent) =>
         loadedPlugin.manifest.subscribes.includes(nextEvent.trigger),
@@ -165,7 +178,12 @@ async function dispatchToOtherPlugins(
   for (const plugin of plugins) {
     if (plugin.manifest.id === sourcePlugin.manifest.id) continue;
     if (plugin.manifest.subscribes.includes(event.trigger)) {
-      await runPluginLoop(plugin, target, event, 1);
+      try {
+        await runPluginLoop(plugin, target, event, 1);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`[${plugin.manifest.id}] Dispatch error: ${message}`);
+      }
     }
   }
 }
