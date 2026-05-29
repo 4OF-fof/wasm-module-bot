@@ -1,10 +1,18 @@
-import { mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import type { SessionSummarizer } from "./summarizer.js";
 
 export interface SessionMessage {
   role: "system" | "user" | "assistant";
   content: string;
+}
+
+interface StaleRow {
+  session_id: string;
+  messages: string;
+  created_at: string;
+  last_access_at: string;
 }
 
 const DEFAULT_MAX_MESSAGES = 500;
@@ -12,10 +20,12 @@ const DEFAULT_SESSION_TTL_MINUTES = 60;
 
 export class AgentStore {
   private readonly database: DatabaseSync;
+  private readonly summarizer: SessionSummarizer | undefined;
   private _maxMessages: number | null = null;
   private _sessionTtlMinutes: number | null = null;
 
-  constructor(path = agentDatabasePath()) {
+  constructor(path = agentDatabasePath(), summarizer?: SessionSummarizer) {
+    this.summarizer = summarizer;
     mkdirSync(dirname(path), { recursive: true });
     this.database = new DatabaseSync(path);
     this.migrate();
@@ -63,8 +73,8 @@ export class AgentStore {
    * Returns all messages for the given session.
    * Returns an empty array if the session doesn't exist or has been evicted by TTL.
    */
-  getMessages(sessionId: string): SessionMessage[] {
-    this.purgeStale();
+  async getMessages(sessionId: string): Promise<SessionMessage[]> {
+    await this.purgeStale();
 
     const row = this.database
       .prepare("SELECT messages FROM agent_sessions WHERE session_id = ?")
@@ -80,12 +90,15 @@ export class AgentStore {
 
   /**
    * Appends messages to a session and returns the full message list after
-   * applying the ring-buffer cap (default 100 messages).
+   * applying the ring-buffer cap.
    * Creates the session if it doesn't exist.
-   * Stale sessions are purged before the append.
+   * Stale sessions are purged (summarized → archived → deleted) before the append.
    */
-  appendMessages(sessionId: string, newMessages: SessionMessage[]): SessionMessage[] {
-    this.purgeStale();
+  async appendMessages(
+    sessionId: string,
+    newMessages: SessionMessage[],
+  ): Promise<SessionMessage[]> {
+    await this.purgeStale();
 
     const existing = this.readMessages(sessionId);
     let allMessages = [...existing, ...newMessages];
@@ -129,10 +142,60 @@ export class AgentStore {
       .run(sessionId);
   }
 
-  private purgeStale(): void {
+  /**
+   * Flow for each stale session:
+   *   1. Summarize via LLM
+   *   2. Write summary to {memoryDir}/{date}/{session_id}.md
+   *   3. Delete from DB
+   */
+  private async purgeStale(): Promise<void> {
+    const ttlParam = `-${this.sessionTtlMinutes} minutes`;
+
+    const stale = this.database
+      .prepare(
+        `SELECT session_id, messages, created_at, last_access_at
+         FROM agent_sessions
+         WHERE last_access_at < datetime('now', ?)`,
+      )
+      .all(ttlParam) as unknown as StaleRow[];
+
+    for (const row of stale) {
+      await this.archiveSession(row);
+    }
+
     this.database
       .prepare("DELETE FROM agent_sessions WHERE last_access_at < datetime('now', ?)")
-      .run(`-${this.sessionTtlMinutes} minutes`);
+      .run(ttlParam);
+  }
+
+  private async archiveSession(row: StaleRow): Promise<void> {
+    const messages = JSON.parse(row.messages) as SessionMessage[];
+    if (messages.length === 0) {
+      return;
+    }
+
+    const summary = this.summarizer
+      ? await this.summarizer.summarize(row.session_id, messages)
+      : formatFallbackSummary(row, messages);
+
+    // Derive date from created_at (YYYY-MM-DD).
+    const date = row.created_at.slice(0, 10);
+    const dir = join(memoryDirPath(), date);
+    mkdirSync(dir, { recursive: true });
+
+    const lines: string[] = [
+      `# Session ${row.session_id}`,
+      "",
+      `**Created**: ${row.created_at}`,
+      `**Expired**: ${row.last_access_at}`,
+      `**Messages**: ${messages.length}`,
+      "",
+      "---",
+      "",
+      summary,
+    ];
+
+    writeFileSync(join(dir, `${row.session_id}.md`), lines.join("\n"), "utf-8");
   }
 
   private loadMaxMessages(): number {
@@ -183,14 +246,34 @@ function agentDatabasePath(): string {
   return resolve(process.env.PATCHOULI_DATA_DIR ?? "data", "agent.sqlite");
 }
 
+function memoryDirPath(): string {
+  return resolve(process.env.PATCHOULI_MEMORY_DIR ?? "memory");
+}
+
+/**
+ * Fallback summary when no Summarizer is available.
+ * Formats the conversation as a plain Markdown transcript.
+ */
+function formatFallbackSummary(_row: StaleRow, messages: SessionMessage[]): string {
+  const parts: string[] = [];
+
+  for (const msg of messages) {
+    parts.push(`### ${msg.role}`);
+    parts.push(msg.content);
+    parts.push("");
+  }
+
+  return parts.join("\n");
+}
+
 // ---------------------------------------------------------------------------
 // Singleton
 // ---------------------------------------------------------------------------
 
 let instance: AgentStore | undefined;
 
-export function initAgentStore(path?: string): AgentStore {
-  instance = new AgentStore(path);
+export function initAgentStore(path?: string, summarizer?: SessionSummarizer): AgentStore {
+  instance = new AgentStore(path, summarizer);
   return instance;
 }
 

@@ -1,5 +1,6 @@
 import { Client, Events, GatewayIntentBits, Routes } from "discord.js";
 import { initAgentStore } from "./agent/store.js";
+import { createSessionSummarizer } from "./agent/summarizer.js";
 import { executeEffects, sendErrorToDiscord, type EffectTarget } from "./effect-executor.js";
 import type { BotEvent } from "./generated/plugin-api.js";
 import { configCommand, handleConfigAutocomplete, handleConfigCommand } from "./config-command.js";
@@ -29,7 +30,7 @@ const moduleCommandState = {
 };
 
 // Initialize the agent session store (SQLite-backed, 1h TTL, ring-buffer capped).
-const agentStore = initAgentStore();
+const agentStore = initAgentStore(undefined, createSessionSummarizer());
 
 if (!token) {
   console.log("Patchouli host started in dry-run mode.");

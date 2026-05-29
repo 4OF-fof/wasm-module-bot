@@ -7,10 +7,6 @@ const PLUGIN_VERSION: &str = "0.1.0";
 const TRIGGER: &str = "agent.trigger";
 const EFFECT_RESULT_TRIGGER: &str = "builtin.agent.effect.result";
 
-const SYSTEM_PROMPT: &str = "You are a helpful AI assistant in a Discord server. \
-    Respond concisely and naturally in the same language as the user. \
-    Keep responses friendly and to the point.";
-
 export_plugin! {
     id: PLUGIN_ID,
     version: PLUGIN_VERSION,
@@ -51,18 +47,11 @@ fn handle_agent(event: BotEvent) -> Vec<EffectRequest> {
             let session_id = channel_session_id(&channel_id);
             let effect_id = format!("chat:{}", channel_id);
 
-            // Always include the system prompt. The host uses the latest
-            // system message in the session history as the system prompt.
-            let messages = vec![
-                LlmMessage {
-                    role: "system".to_string(),
-                    content: SYSTEM_PROMPT.to_string(),
-                },
-                LlmMessage {
-                    role: "user".to_string(),
-                    content: prompt,
-                },
-            ];
+            // The host injects the system prompt. The plugin only sends user messages.
+            let messages = vec![LlmMessage {
+                role: "user".to_string(),
+                content: prompt,
+            }];
 
             vec![EffectRequest::agent(effect_id, session_id, messages)]
         }

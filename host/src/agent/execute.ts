@@ -1,9 +1,14 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { generateText, type LanguageModel } from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { effectResultEvent } from "../effect-results.js";
 import type { BotEvent, EffectRequest } from "../generated/plugin-api.js";
 import { getAgentStore } from "./store.js";
+
+const systemPromptPath = join(import.meta.dirname, "..", "..", "prompt", "agent_system_prompt.md");
+const agentSystemPrompt = readFileSync(systemPromptPath, "utf-8");
 
 export async function executeAgent(
   effect: Extract<EffectRequest, { type: "agent" }>,
@@ -54,20 +59,16 @@ export async function executeAgent(
       languageModel = openaiCompatible.chatModel(model);
     }
 
-    // Append incoming messages to the session.
-    // This also evicts stale sessions and enforces the ring-buffer cap.
+    // Append incoming messages (user/assistant only — plugin no longer sends system).
+    // System prompt is always passed from the file, never mixed into session history.
     const store = getAgentStore();
     const newMessages = effect.messages.map((m) => ({
-      role: m.role as "system" | "user" | "assistant",
+      role: m.role as "user" | "assistant",
       content: m.content,
     }));
-    const allMessages = store.appendMessages(effect.sessionId, newMessages);
 
-    // Extract the latest system message as the system prompt; everything else
-    // is sent as chat messages.
-    const systemMessages = allMessages.filter((m) => m.role === "system");
-    const systemPrompt =
-      systemMessages.length > 0 ? systemMessages[systemMessages.length - 1].content : undefined;
+    const allMessages = await store.appendMessages(effect.sessionId, newMessages);
+
     const chatMessages = allMessages
       .filter((m) => m.role !== "system")
       .map((m) => ({
@@ -77,7 +78,7 @@ export async function executeAgent(
 
     const result = await generateText({
       model: languageModel,
-      ...(systemPrompt && { system: systemPrompt }),
+      system: agentSystemPrompt,
       messages: chatMessages,
       providerOptions: {
         anthropic: { cacheControl: true },
@@ -85,7 +86,7 @@ export async function executeAgent(
     });
 
     // Persist assistant response to session history.
-    store.appendMessages(effect.sessionId, [{ role: "assistant", content: result.text }]);
+    await store.appendMessages(effect.sessionId, [{ role: "assistant", content: result.text }]);
 
     return effectResultEvent(pluginId, effect.id, {
       ok: true,
