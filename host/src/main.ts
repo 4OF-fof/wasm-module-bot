@@ -1,4 +1,5 @@
 import { Client, Events, GatewayIntentBits, Routes } from "discord.js";
+import { initAgentStore } from "./agent/store.js";
 import { executeEffects, sendErrorToDiscord, type EffectTarget } from "./effect-executor.js";
 import type { BotEvent } from "./generated/plugin-api.js";
 import {
@@ -26,6 +27,9 @@ const moduleCommandState = {
   refreshEnabledPlugins,
 };
 
+// Initialize the agent session store (SQLite-backed, 1h TTL, ring-buffer capped).
+const agentStore = initAgentStore();
+
 if (!token) {
   console.log("Patchouli host started in dry-run mode.");
   console.log("Set DISCORD_TOKEN to log in as a Discord bot.");
@@ -37,6 +41,7 @@ if (!token) {
         .join(", ")}`,
     );
   }
+  agentStore.close();
   process.exitCode = 0;
 } else {
   const client = new Client({
@@ -218,6 +223,7 @@ async function dispatchToOtherPlugins(
 
 async function shutdown(client: Client, signal: string): Promise<void> {
   console.log(`Received ${signal}. Shutting down Patchouli host.`);
+  agentStore.close();
   client.destroy();
 }
 

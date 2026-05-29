@@ -3,7 +3,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { effectResultEvent } from "../effect-results.js";
 import type { BotEvent, EffectRequest } from "../generated/plugin-api.js";
-import { appendSessionMessages, getSessionMessages } from "./memory.js";
+import { getAgentStore } from "./store.js";
 
 export async function executeAgent(
   effect: Extract<EffectRequest, { type: "agent" }>,
@@ -54,15 +54,17 @@ export async function executeAgent(
       languageModel = openaiCompatible.chatModel(model);
     }
 
-    // Append incoming messages to in-memory session history
+    // Append incoming messages to the session.
+    // This also evicts stale sessions and enforces the ring-buffer cap.
+    const store = getAgentStore();
     const newMessages = effect.messages.map((m) => ({
       role: m.role as "system" | "user" | "assistant",
       content: m.content,
     }));
-    appendSessionMessages(effect.sessionId, newMessages);
+    const allMessages = store.appendMessages(effect.sessionId, newMessages);
 
-    // Send full session history for prompt caching
-    const allMessages = getSessionMessages(effect.sessionId);
+    // Extract the latest system message as the system prompt; everything else
+    // is sent as chat messages.
     const systemMessages = allMessages.filter((m) => m.role === "system");
     const systemPrompt =
       systemMessages.length > 0 ? systemMessages[systemMessages.length - 1].content : undefined;
@@ -82,8 +84,8 @@ export async function executeAgent(
       },
     });
 
-    // Append assistant response to session history
-    appendSessionMessages(effect.sessionId, [{ role: "assistant", content: result.text }]);
+    // Persist assistant response to session history.
+    store.appendMessages(effect.sessionId, [{ role: "assistant", content: result.text }]);
 
     return effectResultEvent(pluginId, effect.id, {
       ok: true,
