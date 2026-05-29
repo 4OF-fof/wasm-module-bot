@@ -7,12 +7,13 @@ export interface SessionMessage {
   content: string;
 }
 
-const DEFAULT_MAX_MESSAGES = 100;
-const SESSION_TTL_MINUTES = 60;
+const DEFAULT_MAX_MESSAGES = 500;
+const DEFAULT_SESSION_TTL_MINUTES = 60;
 
 export class AgentStore {
   private readonly database: DatabaseSync;
   private _maxMessages: number | null = null;
+  private _sessionTtlMinutes: number | null = null;
 
   constructor(path = agentDatabasePath()) {
     mkdirSync(dirname(path), { recursive: true });
@@ -39,6 +40,23 @@ export class AgentStore {
       )
       .run(String(value));
     this._maxMessages = value;
+  }
+
+  get sessionTtlMinutes(): number {
+    if (this._sessionTtlMinutes === null) {
+      this._sessionTtlMinutes = this.loadSessionTtlMinutes();
+    }
+    return this._sessionTtlMinutes;
+  }
+
+  setSessionTtlMinutes(value: number): void {
+    this.database
+      .prepare(
+        `INSERT INTO agent_settings (key, value) VALUES ('session_ttl_minutes', ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      )
+      .run(String(value));
+    this._sessionTtlMinutes = value;
   }
 
   /**
@@ -114,13 +132,21 @@ export class AgentStore {
   private purgeStale(): void {
     this.database
       .prepare("DELETE FROM agent_sessions WHERE last_access_at < datetime('now', ?)")
-      .run(`-${SESSION_TTL_MINUTES} minutes`);
+      .run(`-${this.sessionTtlMinutes} minutes`);
   }
 
   private loadMaxMessages(): number {
-    const row = this.database
-      .prepare("SELECT value FROM agent_settings WHERE key = 'max_messages'")
-      .get() as { value: string } | undefined;
+    return this.loadIntSetting("max_messages", DEFAULT_MAX_MESSAGES);
+  }
+
+  private loadSessionTtlMinutes(): number {
+    return this.loadIntSetting("session_ttl_minutes", DEFAULT_SESSION_TTL_MINUTES);
+  }
+
+  private loadIntSetting(key: string, fallback: number): number {
+    const row = this.database.prepare("SELECT value FROM agent_settings WHERE key = ?").get(key) as
+      | { value: string }
+      | undefined;
 
     if (row) {
       const parsed = Number.parseInt(row.value, 10);
@@ -129,7 +155,7 @@ export class AgentStore {
       }
     }
 
-    return DEFAULT_MAX_MESSAGES;
+    return fallback;
   }
 
   private migrate(): void {
@@ -146,8 +172,9 @@ export class AgentStore {
         value TEXT NOT NULL
       );
 
-      INSERT OR IGNORE INTO agent_settings (key, value)
-      VALUES ('max_messages', '${DEFAULT_MAX_MESSAGES}');
+      INSERT OR IGNORE INTO agent_settings (key, value) VALUES
+        ('max_messages', '${DEFAULT_MAX_MESSAGES}'),
+        ('session_ttl_minutes', '${DEFAULT_SESSION_TTL_MINUTES}');
     `);
   }
 }

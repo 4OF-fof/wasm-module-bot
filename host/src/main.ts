@@ -2,6 +2,7 @@ import { Client, Events, GatewayIntentBits, Routes } from "discord.js";
 import { initAgentStore } from "./agent/store.js";
 import { executeEffects, sendErrorToDiscord, type EffectTarget } from "./effect-executor.js";
 import type { BotEvent } from "./generated/plugin-api.js";
+import { configCommand, handleConfigAutocomplete, handleConfigCommand } from "./config-command.js";
 import {
   handleModuleAutocomplete,
   handleModuleButton,
@@ -33,7 +34,7 @@ const agentStore = initAgentStore();
 if (!token) {
   console.log("Patchouli host started in dry-run mode.");
   console.log("Set DISCORD_TOKEN to log in as a Discord bot.");
-  console.log(`Loaded host command /${moduleCommand.name}.`);
+  console.log(`Loaded host commands: /${configCommand.name}, /${moduleCommand.name}.`);
   for (const loadedPlugin of plugins) {
     console.log(
       `Loaded WASM plugin ${loadedPlugin.manifest.id} with slash commands: ${loadedPlugin.manifest.discord.slashCommands
@@ -60,6 +61,7 @@ if (!token) {
 
   client.on(Events.InteractionCreate, (interaction) => {
     if (interaction.isAutocomplete()) {
+      void handleConfigAutocomplete(interaction);
       void handleModuleAutocomplete(interaction, moduleCommandState);
       return;
     }
@@ -77,12 +79,17 @@ if (!token) {
       return;
     }
 
+    // Host commands (not plugin-handled).
+    void handleConfigCommand(interaction);
     void handleModuleCommand(interaction, moduleCommandState).then((handled) => {
       if (handled) {
         void registerSlashCommandsIfReady();
       }
     });
-    if (interaction.commandName === moduleCommand.name) {
+    if (
+      interaction.commandName === configCommand.name ||
+      interaction.commandName === moduleCommand.name
+    ) {
       return;
     }
 
@@ -235,6 +242,7 @@ async function registerSlashCommands(client: Client<true>): Promise<void> {
   }
 
   const commands = [
+    configCommand,
     moduleCommand,
     ...plugins.flatMap((loadedPlugin) => loadedPlugin.manifest.discord.slashCommands),
   ];
