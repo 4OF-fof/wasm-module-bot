@@ -2,8 +2,9 @@ use std::{fs, path::PathBuf};
 
 use patchouli_plugin_api::{
     ActionPlan, BotEvent, Capability, DiscordEmbed, DiscordEmbedField, DiscordManifest,
-    EffectRequest, EffectResult, HttpMethod, HttpOriginPolicy, ManifestResult, PlanResult,
-    PluginError, PluginManifest, PluginModuleInfo, SlashCommand, TriggerGroup, TriggerSource,
+    EffectRequest, EffectResult, HttpMethod, HttpOriginPolicy, LlmMessage, ManifestResult,
+    PlanResult, PluginError, PluginManifest, PluginModuleInfo, SlashCommand, TriggerGroup,
+    TriggerSource,
 };
 use ts_rs::{Config, TS};
 
@@ -32,6 +33,8 @@ fn main() {
         declaration::<EffectResult>(),
     ]
     .join("\n");
+
+    let output = [output, declaration::<LlmMessage>()].join("\n");
 
     let path =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../host/src/generated/plugin-api.ts");

@@ -26,3 +26,9 @@ export function findMessageTrigger(
   );
   return matched ? { event: trigger.event } : undefined;
 }
+
+export function findMentionTrigger(trigger: TriggerGroup): MatchedTrigger | undefined {
+  if (trigger.type === "none") return undefined;
+  const matched = trigger.sources.some((source) => source.type === "discordMention");
+  return matched ? { event: trigger.event } : undefined;
+}

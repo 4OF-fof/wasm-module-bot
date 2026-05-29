@@ -24,13 +24,28 @@ export function authorizeEffect(manifest: PluginManifest, effect: EffectRequest)
       });
 
       if (!allowed) {
-        throw new Error(`Plugin ${manifest.id} is not allowed to fetch ${effect.method} ${url.hostname}`);
+        throw new Error(
+          `Plugin ${manifest.id} is not allowed to fetch ${effect.method} ${url.hostname}`,
+        );
+      }
+      return;
+    }
+
+    case "llm.provider": {
+      const allowed = manifest.capabilities.some(
+        (capability) => capability.type === "llm.provider",
+      );
+
+      if (!allowed) {
+        throw new Error(`Plugin ${manifest.id} is not allowed to use LLM provider`);
       }
       return;
     }
 
     case "message.send": {
-      const allowed = manifest.capabilities.some((capability) => capability.type === "message.send");
+      const allowed = manifest.capabilities.some(
+        (capability) => capability.type === "message.send",
+      );
 
       if (!allowed) {
         throw new Error(`Plugin ${manifest.id} is not allowed to send messages`);

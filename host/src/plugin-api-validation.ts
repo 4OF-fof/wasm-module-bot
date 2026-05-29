@@ -7,6 +7,7 @@ import type {
   EffectRequest,
   HttpMethod,
   HttpOriginPolicy,
+  LlmMessage,
   ManifestResult,
   PlanResult,
   PluginError,
@@ -123,6 +124,8 @@ function isTriggerSource(value: unknown): value is TriggerSource {
       return isString(value.commandName);
     case "discordMessage":
       return isString(value.content);
+    case "discordMention":
+      return true;
     default:
       return false;
   }
@@ -135,6 +138,7 @@ function isCapability(value: unknown): value is Capability {
 
   switch (value.type) {
     case "discord.interaction.reply":
+    case "llm.provider":
     case "message.send":
       return true;
     case "http.get":
@@ -226,6 +230,15 @@ function normalizeEffectRequest(value: unknown): EffectRequest | undefined {
         channelId: value.channelId,
         text: value.text,
       };
+    case "llm.provider":
+      if (!isArrayOf(value.messages, isLlmMessage)) {
+        return undefined;
+      }
+      return {
+        type: value.type,
+        id: value.id,
+        messages: value.messages,
+      };
     default:
       return undefined;
   }
@@ -251,6 +264,10 @@ function isDiscordEmbedField(value: unknown): value is DiscordEmbedField {
 
 function isHttpMethod(value: unknown): value is HttpMethod {
   return value === "GET" || value === "POST";
+}
+
+function isLlmMessage(value: unknown): value is LlmMessage {
+  return isRecord(value) && isString(value.role) && isString(value.content);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

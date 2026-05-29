@@ -13,6 +13,9 @@
     "cleanup": "find ../plugins -type d -name target -exec rm -rf {} + 2>/dev/null; rm -rf dist"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.80",
+    "@ai-sdk/openai-compatible": "^2.0.48",
+    "ai": "^6.0.191",
     "discord.js": "^14.26.4"
   },
   "devDependencies": {

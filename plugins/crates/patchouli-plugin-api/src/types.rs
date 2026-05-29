@@ -101,6 +101,16 @@ impl TriggerGroup {
         self
     }
 
+    pub fn mention(mut self) -> Self {
+        if let TriggerGroup::Group {
+            ref mut sources, ..
+        } = self
+        {
+            sources.push(TriggerSource::DiscordMention);
+        }
+        self
+    }
+
     pub fn event(&self) -> Option<&str> {
         match self {
             TriggerGroup::Group { event, .. } => Some(event),
@@ -131,6 +141,8 @@ pub enum TriggerSource {
     DiscordSlashCommand { command_name: String },
     #[serde(rename = "discordMessage", rename_all = "camelCase")]
     DiscordMessage { content: String },
+    #[serde(rename = "discordMention")]
+    DiscordMention,
 }
 
 #[derive(Serialize)]
@@ -205,6 +217,11 @@ pub enum EffectRequest {
         method: HttpMethod,
         url: String,
     },
+    #[serde(rename = "llm.provider", rename_all = "camelCase")]
+    LlmProvider {
+        id: String,
+        messages: Vec<LlmMessage>,
+    },
     #[serde(rename = "message.send", rename_all = "camelCase")]
     MessageSend {
         id: String,
@@ -219,6 +236,7 @@ impl EffectRequest {
         match self {
             Self::DiscordInteractionReply { id, .. } => id,
             Self::HttpFetch { id, .. } => id,
+            Self::LlmProvider { id, .. } => id,
             Self::MessageSend { id, .. } => id,
         }
     }
@@ -260,6 +278,13 @@ impl EffectRequest {
         }
     }
 
+    pub fn llm_provider(id: impl Into<String>, messages: Vec<LlmMessage>) -> Self {
+        Self::LlmProvider {
+            id: id.into(),
+            messages,
+        }
+    }
+
     pub fn message_send(
         id: impl Into<String>,
         channel_id: impl Into<String>,
@@ -289,6 +314,14 @@ pub struct DiscordEmbedField {
     pub name: String,
     pub value: String,
     pub inline: bool,
+}
+
+#[derive(Deserialize, Serialize)]
+#[cfg_attr(feature = "ts-export", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct LlmMessage {
+    pub role: String,
+    pub content: String,
 }
 
 #[derive(Deserialize, Serialize)]

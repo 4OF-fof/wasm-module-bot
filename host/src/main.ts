@@ -13,7 +13,7 @@ import {
   type LoadedPlugin,
   pluginModules,
 } from "./plugin-registry.js";
-import { findMessageTrigger, findSlashCommandTrigger } from "./triggers.js";
+import { findMessageTrigger, findMentionTrigger, findSlashCommandTrigger } from "./triggers.js";
 
 const maxEffectLoopSteps = 5;
 const token = process.env.DISCORD_TOKEN;
@@ -104,7 +104,25 @@ if (!token) {
       return;
     }
 
+    if (!client.user) return;
+    const isMentioned = message.mentions.has(client.user.id);
+
     for (const loadedPlugin of plugins) {
+      // Check for mention trigger
+      if (isMentioned) {
+        const mentionTrigger = findMentionTrigger(loadedPlugin.manifest.trigger);
+        if (mentionTrigger) {
+          void runPluginLoop(loadedPlugin, message.channel, {
+            type: "discord.message",
+            trigger: mentionTrigger.event,
+            channelId: message.channelId,
+            content: message.content,
+          });
+          continue;
+        }
+      }
+
+      // Check for content match trigger
       const trigger = findMessageTrigger(loadedPlugin.manifest.trigger, message.content);
       if (!trigger) {
         continue;

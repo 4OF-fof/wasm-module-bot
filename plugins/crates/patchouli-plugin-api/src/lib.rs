@@ -11,8 +11,8 @@ pub use slash::{
 };
 pub use types::{
     ActionPlan, BotEvent, DiscordEmbed, DiscordEmbedField, DiscordManifest, EffectRequest,
-    EffectResult, ManifestResult, PlanResult, PluginError, PluginManifest, PluginModuleInfo,
-    SlashCommand, TriggerGroup, TriggerSource,
+    EffectResult, LlmMessage, ManifestResult, PlanResult, PluginError, PluginManifest,
+    PluginModuleInfo, SlashCommand, TriggerGroup, TriggerSource,
 };
 #[doc(hidden)]
 pub use wasm_abi::{alloc_buffer, dealloc_buffer, return_value};
