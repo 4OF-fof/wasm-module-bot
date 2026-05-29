@@ -15,10 +15,7 @@ export const moduleCommand = new SlashCommandBuilder()
   .setName("module")
   .setDescription("Manage Patchouli modules.")
   .addStringOption((option) =>
-    option
-      .setName("id")
-      .setDescription("Module id. Omit to show all modules.")
-      .setRequired(false),
+    option.setName("id").setDescription("Module id. Omit to show all modules.").setRequired(false),
   )
   .toJSON();
 
@@ -27,8 +24,9 @@ export type ModuleCommandState = {
   refreshEnabledPlugins(): void;
 };
 
-const togglePrefix = "module:toggle:";
-const infoPrefix = "module:info:";
+const customIdPrefix = "module:";
+const togglePrefix = `${customIdPrefix}toggle:`;
+const infoPrefix = `${customIdPrefix}info:`;
 const listView = "list";
 const infoView = "info";
 
@@ -87,7 +85,9 @@ export async function handleModuleButton(
   }
 
   setCatalogEnabled(state, entry, !entry.enabled);
-  await interaction.update(view === listView ? moduleListPayload(state.catalog) : moduleInfoPayload(entry));
+  await interaction.update(
+    view === listView ? moduleListPayload(state.catalog) : moduleInfoPayload(entry),
+  );
   return true;
 }
 
@@ -205,9 +205,7 @@ function capabilityList(entry: PluginCatalogEntry): string {
     return "None";
   }
 
-  return entry.manifest.capabilities
-    .map((capability) => capability.type)
-    .join("\n");
+  return entry.manifest.capabilities.map((capability) => capability.type).join("\n");
 }
 
 function moduleSummary(entry: PluginCatalogEntry): string {

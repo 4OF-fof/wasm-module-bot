@@ -5,18 +5,20 @@ use patchouli_plugin_api::{
 
 const PLUGIN_ID: &str = "builtin.status";
 const PLUGIN_VERSION: &str = "0.1.0";
-const COMMAND_NAME: &str = "status";
+const TRIGGER: &str = "status.trigger";
+const NAME: &str = "status";
+const DISCRIPTION: &str = "Show Patchouli runtime status.";
 
 export_plugin! {
     id: PLUGIN_ID,
     version: PLUGIN_VERSION,
     triggers: [
         TriggerGroup {
-            event: "slash.status".to_string(),
-            name: COMMAND_NAME.to_string(),
-            description: "Show Patchouli runtime status.".to_string(),
+            event: TRIGGER.to_string(),
+            name: NAME.to_string(),
+            description: DISCRIPTION.to_string(),
             sources: vec![
-                TriggerSource::DiscordSlashCommand { command_name: COMMAND_NAME.to_string() },
+                TriggerSource::DiscordSlashCommand { command_name: NAME.to_string() },
             ],
         },
     ],
@@ -24,7 +26,7 @@ export_plugin! {
     capabilities: [Capability::DiscordInteractionReply],
     handlers: [
         {
-            event: "slash.status",
+            event: TRIGGER,
             handle: handle_status,
         },
     ],
@@ -44,7 +46,7 @@ fn handle_status(event: BotEvent) -> Vec<EffectRequest> {
                 .join("\n");
 
             vec![EffectRequest::DiscordInteractionReply {
-                id: "reply-status".to_string(),
+                id: String::new(),
                 interaction_id,
                 content: None,
                 embeds: vec![DiscordEmbed {

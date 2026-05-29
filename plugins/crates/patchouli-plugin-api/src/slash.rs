@@ -22,7 +22,7 @@ pub fn manifest_for(
         id: id.to_string(),
         version: version.to_string(),
         triggers: triggers.to_vec(),
-        subscribes: merged_subscribes(triggers, subscribes),
+        subscribes: subscribes.iter().map(|s| s.to_string()).collect(),
         capabilities: capabilities.to_vec(),
         discord: DiscordManifest {
             slash_commands: collect_slash_commands(triggers),
@@ -48,29 +48,6 @@ fn push_unique_command(commands: &mut Vec<SlashCommand>, name: &str, description
             name: name.to_string(),
             description: description.to_string(),
         });
-    }
-}
-
-fn merged_subscribes(
-    triggers: &[TriggerGroup],
-    subscribes: &'static [&'static str],
-) -> Vec<String> {
-    let mut merged = Vec::new();
-
-    for event in triggers.iter().map(|g| g.event.as_str()) {
-        push_unique(&mut merged, event);
-    }
-
-    for subscribe in subscribes {
-        push_unique(&mut merged, subscribe);
-    }
-
-    merged
-}
-
-fn push_unique(values: &mut Vec<String>, value: &str) {
-    if !values.iter().any(|existing| existing == value) {
-        values.push(value.to_string());
     }
 }
 

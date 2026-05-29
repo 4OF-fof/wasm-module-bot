@@ -1,8 +1,4 @@
-import {
-  type ChatInputCommandInteraction,
-  MessageFlags,
-  type TextBasedChannel,
-} from "discord.js";
+import { type ChatInputCommandInteraction, MessageFlags, type TextBasedChannel } from "discord.js";
 import { authorizeEffect } from "./authorize.js";
 import { effectResultEvent } from "./effect-results.js";
 import type { BotEvent, EffectRequest, PluginManifest } from "./generated/plugin-api.js";
@@ -12,6 +8,7 @@ export type EffectTarget = ChatInputCommandInteraction | TextBasedChannel;
 type EffectHandler<T extends EffectRequest> = (
   effect: T,
   target: EffectTarget,
+  pluginId: string,
 ) => Promise<BotEvent>;
 
 const effectHandlers = {
@@ -31,29 +28,34 @@ export async function executeEffects(
 
   for (const effect of effects) {
     authorizeEffect(manifest, effect);
-    resultEvents.push(await executeEffect(effect, target));
+    resultEvents.push(await executeEffect(effect, target, manifest.id));
   }
 
   return resultEvents;
 }
 
-async function executeEffect(effect: EffectRequest, target: EffectTarget): Promise<BotEvent> {
+async function executeEffect(
+  effect: EffectRequest,
+  target: EffectTarget,
+  pluginId: string,
+): Promise<BotEvent> {
   switch (effect.type) {
     case "discord.interaction.reply":
-      return effectHandlers[effect.type](effect, target);
+      return effectHandlers[effect.type](effect, target, pluginId);
     case "http.fetch":
-      return effectHandlers[effect.type](effect, target);
+      return effectHandlers[effect.type](effect, target, pluginId);
     case "message.send":
-      return effectHandlers[effect.type](effect, target);
+      return effectHandlers[effect.type](effect, target, pluginId);
   }
 }
 
 async function executeHttpFetch(
   effect: Extract<EffectRequest, { type: "http.fetch" }>,
   _target: EffectTarget,
+  pluginId: string,
 ): Promise<BotEvent> {
   const response = await fetch(effect.url, { method: effect.method });
-  return effectResultEvent(effect.id, {
+  return effectResultEvent(pluginId, effect.id, {
     ok: response.ok,
     status: response.status,
     body: await response.text(),
@@ -63,13 +65,15 @@ async function executeHttpFetch(
 async function executeMessageSend(
   effect: Extract<EffectRequest, { type: "message.send" }>,
   target: EffectTarget,
+  pluginId: string,
 ): Promise<BotEvent> {
-  if (!("send" in target)) {
+  const channel = "send" in target ? target : "channel" in target ? target.channel : null;
+  if (!channel || !("send" in channel)) {
     throw new Error("Message send effect requires a text channel target");
   }
 
-  await target.send(effect.text);
-  return effectResultEvent(effect.id, {
+  await channel.send(effect.text);
+  return effectResultEvent(pluginId, effect.id, {
     ok: true,
     status: 200,
     body: "",
@@ -79,6 +83,7 @@ async function executeMessageSend(
 async function executeInteractionReply(
   effect: Extract<EffectRequest, { type: "discord.interaction.reply" }>,
   target: EffectTarget,
+  pluginId: string,
 ): Promise<BotEvent> {
   if (!("reply" in target)) {
     throw new Error("Discord interaction reply effect requires an interaction target");
@@ -94,7 +99,7 @@ async function executeInteractionReply(
     flags: effect.ephemeral ? MessageFlags.Ephemeral : undefined,
   });
 
-  return effectResultEvent(effect.id, {
+  return effectResultEvent(pluginId, effect.id, {
     ok: true,
     status: 200,
     body: "",
