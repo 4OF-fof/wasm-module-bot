@@ -57,18 +57,22 @@ pub struct TriggerGroup {
 }
 
 impl TriggerGroup {
-    pub fn slash(
-        event: impl Into<String>,
-        name: impl Into<String>,
-        description: impl Into<String>,
-    ) -> Self {
-        let name = name.into();
+    pub fn register(event: impl Into<String>) -> Self {
         Self {
             event: event.into(),
-            name: name.clone(),
-            description: description.into(),
-            sources: vec![TriggerSource::DiscordSlashCommand { command_name: name }],
+            name: String::new(),
+            description: String::new(),
+            sources: Vec::new(),
         }
+    }
+
+    pub fn slash(mut self, name: impl Into<String>, description: impl Into<String>) -> Self {
+        let name = name.into();
+        self.name = name.clone();
+        self.description = description.into();
+        self.sources
+            .push(TriggerSource::DiscordSlashCommand { command_name: name });
+        self
     }
 
     pub fn message(mut self, content: impl Into<String>) -> Self {

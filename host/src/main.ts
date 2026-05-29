@@ -1,18 +1,7 @@
-import {
-  Client,
-  Events,
-  GatewayIntentBits,
-  Routes,
-} from "discord.js";
+import { Client, Events, GatewayIntentBits, Routes } from "discord.js";
 import { executeEffects, type EffectTarget } from "./effect-executor.js";
-import type {
-  BotEvent,
-} from "./generated/plugin-api.js";
-import {
-  handleModuleButton,
-  handleModuleCommand,
-  moduleCommand,
-} from "./module-command.js";
+import type { BotEvent } from "./generated/plugin-api.js";
+import { handleModuleButton, handleModuleCommand, moduleCommand } from "./module-command.js";
 import {
   enabledPlugins,
   loadPluginCatalog,
@@ -139,6 +128,7 @@ async function runPluginLoop(
   loadedPlugin: LoadedPlugin,
   target: EffectTarget,
   initialEvent: BotEvent,
+  dispatchDepth: number = 0,
 ): Promise<void> {
   const eventQueue: BotEvent[] = [initialEvent];
   let step = 0;
@@ -156,6 +146,27 @@ async function runPluginLoop(
         loadedPlugin.manifest.subscribes.includes(nextEvent.trigger),
       ),
     );
+
+    // Dispatch effect.result events to other subscribing plugins (depth 0 only to prevent cascading)
+    if (dispatchDepth === 0) {
+      const effectResultEvents = nextEvents.filter((e) => e.type === "effect.result");
+      for (const effectEvent of effectResultEvents) {
+        await dispatchToOtherPlugins(effectEvent, loadedPlugin, target);
+      }
+    }
+  }
+}
+
+async function dispatchToOtherPlugins(
+  event: BotEvent,
+  sourcePlugin: LoadedPlugin,
+  target: EffectTarget,
+): Promise<void> {
+  for (const plugin of plugins) {
+    if (plugin.manifest.id === sourcePlugin.manifest.id) continue;
+    if (plugin.manifest.subscribes.includes(event.trigger)) {
+      await runPluginLoop(plugin, target, event, 1);
+    }
   }
 }
 
@@ -166,7 +177,9 @@ async function shutdown(client: Client, signal: string): Promise<void> {
 
 async function registerSlashCommands(client: Client<true>): Promise<void> {
   if (!guildId) {
-    throw new Error("DISCORD_GUILD_ID is required because Patchouli only registers guild commands.");
+    throw new Error(
+      "DISCORD_GUILD_ID is required because Patchouli only registers guild commands.",
+    );
   }
 
   const commands = [
@@ -197,7 +210,9 @@ function configuredGuildId(): string | undefined {
 
   const value = process.env.DISCORD_GUILD_ID;
   if (!value) {
-    throw new Error("DISCORD_GUILD_ID is required because Patchouli only registers guild commands.");
+    throw new Error(
+      "DISCORD_GUILD_ID is required because Patchouli only registers guild commands.",
+    );
   }
   return value;
 }

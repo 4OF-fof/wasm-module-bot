@@ -5,22 +5,21 @@ use patchouli_plugin_api::{
 
 const PLUGIN_ID: &str = "builtin.status";
 const PLUGIN_VERSION: &str = "0.1.0";
-
-const EVENT_STATUS: &str = "event.status";
-const COMMAND_NAME: &str = "status";
-const COMMAND_DESCRIPTION: &str = "Show Patchouli runtime status.";
+const TRIGGER: &str = "status.trigger";
+const NAME: &str = "status";
+const DISCRIPTION: &str = "Show Patchouli runtime status.";
 
 export_plugin! {
     id: PLUGIN_ID,
     version: PLUGIN_VERSION,
     triggers: [
-        TriggerGroup::slash(EVENT_STATUS, COMMAND_NAME, COMMAND_DESCRIPTION),
+        TriggerGroup::register(TRIGGER).slash(NAME, DISCRIPTION),
     ],
     subscribes: [],
     capabilities: [Capability::DiscordInteractionReply],
     handlers: [
         {
-            event: EVENT_STATUS,
+            event: TRIGGER,
             handle: handle_status,
         },
     ],
