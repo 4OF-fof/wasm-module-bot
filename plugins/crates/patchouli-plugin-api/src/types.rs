@@ -223,11 +223,19 @@ pub enum EffectRequest {
         session_id: String,
         messages: Vec<LlmMessage>,
     },
-    #[serde(rename = "message.send", rename_all = "camelCase")]
-    MessageSend {
+    #[serde(rename = "discord.message.send", rename_all = "camelCase")]
+    DiscordMessageSend {
         id: String,
         channel_id: String,
         text: String,
+    },
+    #[serde(rename = "discord.channel.history", rename_all = "camelCase")]
+    DiscordChannelHistory {
+        id: String,
+        channel_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        before: Option<String>,
+        limit: u32,
     },
     // TODO: Add state.write when the host can authorize and persist state.
 }
@@ -238,7 +246,8 @@ impl EffectRequest {
             Self::DiscordInteractionReply { id, .. } => id,
             Self::HttpFetch { id, .. } => id,
             Self::Agent { id, .. } => id,
-            Self::MessageSend { id, .. } => id,
+            Self::DiscordMessageSend { id, .. } => id,
+            Self::DiscordChannelHistory { id, .. } => id,
         }
     }
 
@@ -291,15 +300,29 @@ impl EffectRequest {
         }
     }
 
-    pub fn message_send(
+    pub fn discord_message_send(
         id: impl Into<String>,
         channel_id: impl Into<String>,
         text: impl Into<String>,
     ) -> Self {
-        Self::MessageSend {
+        Self::DiscordMessageSend {
             id: id.into(),
             channel_id: channel_id.into(),
             text: text.into(),
+        }
+    }
+
+    pub fn channel_history(
+        id: impl Into<String>,
+        channel_id: impl Into<String>,
+        before: Option<String>,
+        limit: u32,
+    ) -> Self {
+        Self::DiscordChannelHistory {
+            id: id.into(),
+            channel_id: channel_id.into(),
+            before,
+            limit,
         }
     }
 }

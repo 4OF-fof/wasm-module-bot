@@ -40,13 +40,24 @@ export function authorizeEffect(manifest: PluginManifest, effect: EffectRequest)
       return;
     }
 
-    case "message.send": {
+    case "discord.message.send": {
       const allowed = manifest.capabilities.some(
-        (capability) => capability.type === "message.send",
+        (capability) => capability.type === "discord.message.send",
       );
 
       if (!allowed) {
         throw new Error(`Plugin ${manifest.id} is not allowed to send messages`);
+      }
+      return;
+    }
+
+    case "discord.channel.history": {
+      const allowed = manifest.capabilities.some(
+        (capability) => capability.type === "discord.channel.history",
+      );
+
+      if (!allowed) {
+        throw new Error(`Plugin ${manifest.id} is not allowed to read channel history`);
       }
       return;
     }

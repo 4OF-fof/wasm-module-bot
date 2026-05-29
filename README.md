@@ -20,7 +20,8 @@ Discord event
 - Discord message trigger
 - `discord.interaction.reply`
 - `http.fetch`
-- `message.send`
+- `discord.message.send`
+- `agent`
 - effect result loop
 
 ## Plugins

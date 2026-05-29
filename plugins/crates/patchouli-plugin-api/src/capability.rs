@@ -10,8 +10,10 @@ pub enum Capability {
     HttpGet { origin_policy: HttpOriginPolicy },
     #[serde(rename = "agent")]
     Agent,
-    #[serde(rename = "message.send")]
-    MessageSend,
+    #[serde(rename = "discord.message.send")]
+    DiscordMessageSend,
+    #[serde(rename = "discord.channel.history")]
+    DiscordChannelHistory,
     // TODO: Add state.read and state.write when the host gains a state store.
 }
 

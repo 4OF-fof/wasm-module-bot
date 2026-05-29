@@ -78,7 +78,7 @@ export class AgentStore {
 
     const row = this.database
       .prepare("SELECT messages FROM agent_sessions WHERE session_id = ?")
-      .get(sessionId) as { messages: string } | undefined;
+      .get(sessionId) as unknown as { messages: string } | undefined;
 
     if (!row) {
       return [];
@@ -93,31 +93,88 @@ export class AgentStore {
    * applying the ring-buffer cap.
    * Creates the session if it doesn't exist.
    * Stale sessions are purged (summarized → archived → deleted) before the append.
+   * When creating a new session, channelId is persisted as metadata.
    */
   async appendMessages(
     sessionId: string,
     newMessages: SessionMessage[],
+    channelId?: string,
+    pluginId?: string,
   ): Promise<SessionMessage[]> {
     await this.purgeStale();
 
     const existing = this.readMessages(sessionId);
+    const isNew = existing.length === 0;
     let allMessages = [...existing, ...newMessages];
 
     if (allMessages.length > this.maxMessages) {
       allMessages = allMessages.slice(allMessages.length - this.maxMessages);
     }
 
-    this.database
-      .prepare(
-        `INSERT INTO agent_sessions (session_id, messages, created_at, last_access_at)
-         VALUES (?, ?, datetime('now'), datetime('now'))
-         ON CONFLICT(session_id) DO UPDATE SET
-           messages = excluded.messages,
-           last_access_at = excluded.last_access_at`,
-      )
-      .run(sessionId, JSON.stringify(allMessages));
+    if (isNew && channelId) {
+      this.database
+        .prepare(
+          `INSERT INTO agent_sessions (session_id, channel_id, plugin_id, messages, created_at, last_access_at)
+           VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+           ON CONFLICT(session_id) DO UPDATE SET
+             channel_id = COALESCE(agent_sessions.channel_id, excluded.channel_id),
+             plugin_id = COALESCE(agent_sessions.plugin_id, excluded.plugin_id),
+             messages = excluded.messages,
+             last_access_at = excluded.last_access_at`,
+        )
+        .run(sessionId, channelId, pluginId ?? null, JSON.stringify(allMessages));
+    } else {
+      this.database
+        .prepare(
+          `INSERT INTO agent_sessions (session_id, messages, created_at, last_access_at)
+           VALUES (?, ?, datetime('now'), datetime('now'))
+           ON CONFLICT(session_id) DO UPDATE SET
+             messages = excluded.messages,
+             last_access_at = excluded.last_access_at`,
+        )
+        .run(sessionId, JSON.stringify(allMessages));
+    }
 
     return allMessages;
+  }
+
+  /**
+   * Returns the active session bound to the given channel, if any.
+   * Excludes sessions past TTL.
+   */
+  async getActiveSessionByChannel(
+    channelId: string,
+  ): Promise<{ sessionId: string; pluginId: string } | undefined> {
+    await this.purgeStale();
+
+    const ttlParam = `-${this.sessionTtlMinutes} minutes`;
+    const row = this.database
+      .prepare(
+        `SELECT session_id, plugin_id FROM agent_sessions
+         WHERE channel_id = ? AND last_access_at >= datetime('now', ?)`,
+      )
+      .get(channelId, ttlParam) as unknown as { session_id: string; plugin_id: string } | undefined;
+
+    if (!row || !row.plugin_id) return undefined;
+    return { sessionId: row.session_id, pluginId: row.plugin_id };
+  }
+
+  /**
+   * Immediately archives the session (summarize → write Markdown) and deletes
+   * it from the database. Use this for explicit session termination.
+   */
+  async endSession(sessionId: string): Promise<void> {
+    const row = this.database
+      .prepare(
+        `SELECT session_id, messages, created_at, last_access_at
+         FROM agent_sessions WHERE session_id = ?`,
+      )
+      .get(sessionId) as unknown as StaleRow | undefined;
+
+    if (!row) return;
+
+    await this.archiveSession(row);
+    this.database.prepare("DELETE FROM agent_sessions WHERE session_id = ?").run(sessionId);
   }
 
   // ---------------------------------------------------------------------------
@@ -127,7 +184,7 @@ export class AgentStore {
   private readMessages(sessionId: string): SessionMessage[] {
     const row = this.database
       .prepare("SELECT messages FROM agent_sessions WHERE session_id = ?")
-      .get(sessionId) as { messages: string } | undefined;
+      .get(sessionId) as unknown as { messages: string } | undefined;
 
     if (!row) {
       return [];
@@ -225,6 +282,8 @@ export class AgentStore {
     this.database.exec(`
       CREATE TABLE IF NOT EXISTS agent_sessions (
         session_id TEXT PRIMARY KEY,
+        channel_id TEXT,
+        plugin_id TEXT,
         messages TEXT NOT NULL DEFAULT '[]',
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
         last_access_at TEXT NOT NULL DEFAULT (datetime('now'))

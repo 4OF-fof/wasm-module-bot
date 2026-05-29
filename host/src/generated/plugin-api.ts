@@ -12,7 +12,7 @@ export type TriggerGroup = { "type": "triggerGroup", event: string, name: string
 
 export type TriggerSource = { "type": "discordSlashCommand", commandName: string, } | { "type": "discordMessage", content: string, } | { "type": "discordMention" };
 
-export type Capability = { "type": "discord.interaction.reply" } | { "type": "http.get", originPolicy: HttpOriginPolicy, } | { "type": "agent" } | { "type": "message.send" };
+export type Capability = { "type": "discord.interaction.reply" } | { "type": "http.get", originPolicy: HttpOriginPolicy, } | { "type": "agent" } | { "type": "discord.message.send" } | { "type": "discord.channel.history" };
 
 export type HttpOriginPolicy = { "type": "known", origins: Array<string>, } | { "type": "dynamic" };
 
@@ -28,7 +28,7 @@ export type BotEvent = { "type": "discord.interaction.command", trigger: string,
 
 export type ActionPlan = { effects: Array<EffectRequest>, };
 
-export type EffectRequest = { "type": "discord.interaction.reply", id: string, interactionId: string, content: string | null, embeds: Array<DiscordEmbed>, ephemeral: boolean, } | { "type": "http.fetch", id: string, method: HttpMethod, url: string, } | { "type": "agent", id: string, sessionId: string, messages: Array<LlmMessage>, } | { "type": "message.send", id: string, channelId: string, text: string, };
+export type EffectRequest = { "type": "discord.interaction.reply", id: string, interactionId: string, content: string | null, embeds: Array<DiscordEmbed>, ephemeral: boolean, } | { "type": "http.fetch", id: string, method: HttpMethod, url: string, } | { "type": "agent", id: string, sessionId: string, messages: Array<LlmMessage>, } | { "type": "discord.message.send", id: string, channelId: string, text: string, } | { "type": "discord.channel.history", id: string, channelId: string, before: string | null, limit: number, };
 
 export type DiscordEmbed = { title: string, description: string, fields: Array<DiscordEmbedField>, };
 

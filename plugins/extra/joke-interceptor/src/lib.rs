@@ -13,7 +13,7 @@ export_plugin! {
     trigger: TriggerGroup::None,
     subscribes: [EFFECT_RESULT],
     capabilities: [
-        Capability::MessageSend,
+        Capability::DiscordMessageSend,
     ],
     handlers: [
         {
@@ -38,7 +38,7 @@ fn handle_effect_result(event: BotEvent) -> Vec<EffectRequest> {
                 .or_else(|| effect_id.strip_prefix(EFFECT_CHANNEL));
 
             match channel_id {
-                Some(id) => vec![EffectRequest::message_send(
+                Some(id) => vec![EffectRequest::discord_message_send(
                     format!("intercept:{id}"),
                     id,
                     INTERCEPT_MESSAGE,

@@ -22,7 +22,7 @@ export_plugin! {
     capabilities: [
         Capability::DiscordInteractionReply,
         Capability::http_get(TARGET_ORIGIN),
-        Capability::MessageSend,
+        Capability::DiscordMessageSend,
     ],
     handlers: [
         {
@@ -73,7 +73,7 @@ fn handle_effect_result(event: BotEvent) -> Vec<EffectRequest> {
             }
 
             if let Some(channel_id) = effect_id.strip_prefix(EFFECT_CHANNEL) {
-                return vec![EffectRequest::message_send(
+                return vec![EffectRequest::discord_message_send(
                     format!("send-joke:{channel_id}"),
                     channel_id,
                     text,

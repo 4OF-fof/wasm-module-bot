@@ -15,8 +15,9 @@ type EffectHandler<T extends EffectRequest> = (
 const effectHandlers = {
   "discord.interaction.reply": executeInteractionReply,
   "http.fetch": executeHttpFetch,
-  agent: (effect, _target, pluginId) => executeAgent(effect, pluginId),
-  "message.send": executeMessageSend,
+  agent: (effect, target, pluginId) => executeAgent(effect, pluginId, extractChannelId(target)),
+  "discord.message.send": executeDiscordMessageSend,
+  "discord.channel.history": executeChannelHistory,
 } satisfies {
   [Type in EffectRequest["type"]]: EffectHandler<Extract<EffectRequest, { type: Type }>>;
 };
@@ -85,7 +86,9 @@ async function executeEffect(
       return effectHandlers[effect.type](effect, target, pluginId);
     case "agent":
       return effectHandlers[effect.type](effect, target, pluginId);
-    case "message.send":
+    case "discord.message.send":
+      return effectHandlers[effect.type](effect, target, pluginId);
+    case "discord.channel.history":
       return effectHandlers[effect.type](effect, target, pluginId);
   }
 }
@@ -103,8 +106,8 @@ async function executeHttpFetch(
   });
 }
 
-async function executeMessageSend(
-  effect: Extract<EffectRequest, { type: "message.send" }>,
+async function executeDiscordMessageSend(
+  effect: Extract<EffectRequest, { type: "discord.message.send" }>,
   target: EffectTarget,
   pluginId: string,
 ): Promise<BotEvent> {
@@ -119,6 +122,43 @@ async function executeMessageSend(
     status: 200,
     body: "",
   });
+}
+
+async function executeChannelHistory(
+  effect: Extract<EffectRequest, { type: "discord.channel.history" }>,
+  target: EffectTarget,
+  pluginId: string,
+): Promise<BotEvent> {
+  const channel = "send" in target ? target : "channel" in target ? target.channel : null;
+  if (!channel || !("messages" in channel)) {
+    throw new Error("Channel history effect requires a text channel target");
+  }
+
+  try {
+    const fetchOptions: { limit: number; before?: string } = { limit: effect.limit };
+    if (effect.before) {
+      fetchOptions.before = effect.before;
+    }
+    const messages = await channel.messages.fetch(fetchOptions);
+
+    const history = messages
+      .filter((m) => !m.author.bot)
+      .map((m) => ({ author: m.author.displayName, content: m.content }))
+      .reverse();
+
+    return effectResultEvent(pluginId, effect.id, {
+      ok: true,
+      status: 200,
+      body: JSON.stringify({ messages: history }),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return effectResultEvent(pluginId, effect.id, {
+      ok: false,
+      status: 0,
+      body: message,
+    });
+  }
 }
 
 async function executeInteractionReply(
@@ -153,4 +193,11 @@ async function executeInteractionReply(
     status: 200,
     body: "",
   });
+}
+
+function extractChannelId(target: EffectTarget): string | undefined {
+  if ("channelId" in target) {
+    return (target as ChatInputCommandInteraction).channelId ?? undefined;
+  }
+  return (target as TextBasedChannel).id;
 }

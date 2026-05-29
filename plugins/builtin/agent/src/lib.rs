@@ -13,7 +13,7 @@ export_plugin! {
     trigger: TriggerGroup::register(TRIGGER)
         .mention(),
     subscribes: [EFFECT_RESULT_TRIGGER],
-    capabilities: [Capability::Agent, Capability::MessageSend],
+    capabilities: [Capability::Agent, Capability::DiscordMessageSend, Capability::DiscordChannelHistory],
     handlers: [
         {
             event: TRIGGER,
@@ -35,10 +35,19 @@ fn handle_agent(event: BotEvent) -> Vec<EffectRequest> {
         } => {
             let prompt = strip_mentions(&content);
             if prompt.is_empty() {
-                return vec![EffectRequest::message_send(
+                return vec![EffectRequest::discord_message_send(
                     "empty-prompt",
                     channel_id,
                     "何か質問はありますか？",
+                )];
+            }
+
+            // Explicit session end: user asked to stop the conversation.
+            if is_end_command(&prompt) {
+                return vec![EffectRequest::discord_message_send(
+                    "end-session",
+                    channel_id,
+                    "会話を終了しました。また必要なときはメンションで呼びかけてください。",
                 )];
             }
 
@@ -54,9 +63,23 @@ fn handle_agent(event: BotEvent) -> Vec<EffectRequest> {
             }];
 
             vec![EffectRequest::agent(effect_id, session_id, messages)]
+            // Note: channel_id is now available as `channel_id` from the event.
+            // The host will persist it to the session automatically on first agent effect.
         }
         _ => Vec::new(),
     }
+}
+
+/// Returns true if the user's message is an explicit request to end the conversation.
+fn is_end_command(prompt: &str) -> bool {
+    let trimmed = prompt.trim().to_lowercase();
+    trimmed == "終了"
+        || trimmed == "終わり"
+        || trimmed == "さようなら"
+        || trimmed == "bye"
+        || trimmed == "end"
+        || trimmed == "exit"
+        || trimmed == "quit"
 }
 
 fn handle_llm_result(event: BotEvent) -> Vec<EffectRequest> {
@@ -70,7 +93,7 @@ fn handle_llm_result(event: BotEvent) -> Vec<EffectRequest> {
             };
 
             if !result.ok {
-                return vec![EffectRequest::message_send(
+                return vec![EffectRequest::discord_message_send(
                     "llm-error",
                     channel_id,
                     format!("AIへのリクエストに失敗しました: {}", result.body),
@@ -83,7 +106,7 @@ fn handle_llm_result(event: BotEvent) -> Vec<EffectRequest> {
                 result.body
             };
 
-            vec![EffectRequest::message_send(
+            vec![EffectRequest::discord_message_send(
                 "agent-response",
                 channel_id,
                 text,

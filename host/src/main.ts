@@ -1,5 +1,5 @@
 import { Client, Events, GatewayIntentBits, Routes } from "discord.js";
-import { initAgentStore } from "./agent/store.js";
+import { getAgentStore, initAgentStore } from "./agent/store.js";
 import { createSessionSummarizer } from "./agent/summarizer.js";
 import { executeEffects, sendErrorToDiscord, type EffectTarget } from "./effect-executor.js";
 import type { BotEvent } from "./generated/plugin-api.js";
@@ -112,12 +112,46 @@ if (!token) {
     }
   });
 
-  client.on(Events.MessageCreate, (message) => {
+  client.on(Events.MessageCreate, async (message) => {
     if (message.author.bot) {
       return;
     }
 
     if (!client.user) return;
+
+    // Check for an active agent session in this channel.
+    // If one exists, forward the message to the owning plugin (no mention needed).
+    const activeSession = await getAgentStore().getActiveSessionByChannel(message.channelId);
+    if (activeSession) {
+      const plugin = plugins.find((p) => p.manifest.id === activeSession.pluginId);
+      if (plugin) {
+        const triggerEvent =
+          plugin.manifest.trigger.type === "triggerGroup"
+            ? plugin.manifest.trigger.event
+            : "discord.message";
+        // If the user explicitly asks to end, let the plugin say goodbye,
+        // then immediately archive and delete the session.
+        if (isEndCommand(message.content)) {
+          await runPluginLoop(plugin, message.channel, {
+            type: "discord.message",
+            trigger: triggerEvent,
+            channelId: message.channelId,
+            content: message.content,
+          });
+          await getAgentStore().endSession(activeSession.sessionId);
+          return;
+        }
+
+        void runPluginLoop(plugin, message.channel, {
+          type: "discord.message",
+          trigger: triggerEvent,
+          channelId: message.channelId,
+          content: message.content,
+        });
+        return;
+      }
+    }
+
     const isMentioned = message.mentions.has(client.user.id);
 
     for (const loadedPlugin of plugins) {
@@ -276,4 +310,17 @@ function configuredGuildId(): string | undefined {
     );
   }
   return value;
+}
+
+function isEndCommand(content: string): boolean {
+  const trimmed = content.trim().toLowerCase();
+  return (
+    trimmed === "終了" ||
+    trimmed === "終わり" ||
+    trimmed === "さようなら" ||
+    trimmed === "bye" ||
+    trimmed === "end" ||
+    trimmed === "exit" ||
+    trimmed === "quit"
+  );
 }

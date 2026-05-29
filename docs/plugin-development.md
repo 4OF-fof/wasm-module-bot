@@ -43,7 +43,7 @@ export_plugin! {
     subscribes: [],
     capabilities: [
         Capability::DiscordInteractionReply,
-        Capability::MessageSend,
+        Capability::DiscordMessageSend,
     ],
     handlers: [
         {
@@ -63,7 +63,7 @@ fn handle_hello(event: BotEvent) -> Vec<EffectRequest> {
             )]
         }
         BotEvent::DiscordMessage { channel_id, .. } => {
-            vec![EffectRequest::message_send(
+            vec![EffectRequest::discord_message_send(
                 "send-hello",
                 channel_id,
                 "Hello from Patchouli.",
@@ -110,11 +110,13 @@ capabilities: [
 
 現在使える capability は次の通りです。
 
-| capability | できること |
-| --- | --- |
-| `Capability::DiscordInteractionReply` | slash command interaction に reply する。 |
-| `Capability::http_get("hostname")` | 指定 hostname へ HTTP GET request を送る。 |
-| `Capability::MessageSend` | Discord text channel に message を送る。 |
+| capability                            | できること                                 |
+| ------------------------------------- | ------------------------------------------ |
+| `Capability::DiscordInteractionReply` | slash command interaction に reply する。  |
+| `Capability::http_get("hostname")`    | 指定 hostname へ HTTP GET request を送る。 |
+| `Capability::DiscordMessageSend`      | Discord text channel に message を送る。   |
+| `Capability::Agent`                   | LLM を呼び出す。                           |
+| `Capability::DiscordChannelHistory`   | チャンネルのメッセージ履歴を取得する。     |
 
 ## 5. 複数 step の処理は effect.result でつなぐ
 

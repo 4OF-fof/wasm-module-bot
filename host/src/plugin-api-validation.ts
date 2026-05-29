@@ -139,7 +139,8 @@ function isCapability(value: unknown): value is Capability {
   switch (value.type) {
     case "discord.interaction.reply":
     case "agent":
-    case "message.send":
+    case "discord.message.send":
+    case "discord.channel.history":
       return true;
     case "http.get":
       return isHttpOriginPolicy(value.originPolicy);
@@ -220,7 +221,7 @@ function normalizeEffectRequest(value: unknown): EffectRequest | undefined {
         method: value.method,
         url: value.url,
       };
-    case "message.send":
+    case "discord.message.send":
       if (!isString(value.channelId) || !isString(value.text)) {
         return undefined;
       }
@@ -229,6 +230,17 @@ function normalizeEffectRequest(value: unknown): EffectRequest | undefined {
         id: value.id,
         channelId: value.channelId,
         text: value.text,
+      };
+    case "discord.channel.history":
+      if (!isString(value.channelId) || typeof value.limit !== "number") {
+        return undefined;
+      }
+      return {
+        type: value.type,
+        id: value.id,
+        channelId: value.channelId,
+        before: isOptionalString(value.before) ? (value.before ?? null) : null,
+        limit: value.limit,
       };
     case "agent":
       if (!isString(value.sessionId) || !isArrayOf(value.messages, isLlmMessage)) {

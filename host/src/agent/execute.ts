@@ -13,6 +13,7 @@ const agentSystemPrompt = readFileSync(systemPromptPath, "utf-8");
 export async function executeAgent(
   effect: Extract<EffectRequest, { type: "agent" }>,
   pluginId: string,
+  channelId?: string,
 ): Promise<BotEvent> {
   const apiKey = process.env.LLM_API_KEY;
   if (!apiKey) {
@@ -67,7 +68,12 @@ export async function executeAgent(
       content: m.content,
     }));
 
-    const allMessages = await store.appendMessages(effect.sessionId, newMessages);
+    const allMessages = await store.appendMessages(
+      effect.sessionId,
+      newMessages,
+      channelId,
+      pluginId,
+    );
 
     const chatMessages = allMessages
       .filter((m) => m.role !== "system")
