@@ -1,7 +1,12 @@
 import { Client, Events, GatewayIntentBits, Routes } from "discord.js";
 import { executeEffects, sendErrorToDiscord, type EffectTarget } from "./effect-executor.js";
 import type { BotEvent } from "./generated/plugin-api.js";
-import { handleModuleButton, handleModuleCommand, moduleCommand } from "./module-command.js";
+import {
+  handleModuleAutocomplete,
+  handleModuleButton,
+  handleModuleCommand,
+  moduleCommand,
+} from "./module-command.js";
 import {
   enabledPlugins,
   loadPluginCatalog,
@@ -49,6 +54,11 @@ if (!token) {
   });
 
   client.on(Events.InteractionCreate, (interaction) => {
+    if (interaction.isAutocomplete()) {
+      void handleModuleAutocomplete(interaction, moduleCommandState);
+      return;
+    }
+
     if (interaction.isButton()) {
       void handleModuleButton(interaction, moduleCommandState).then((handled) => {
         if (handled) {

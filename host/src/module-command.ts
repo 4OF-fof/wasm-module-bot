@@ -1,5 +1,6 @@
 import {
   ActionRowBuilder,
+  type AutocompleteInteraction,
   ButtonBuilder,
   ButtonStyle,
   type ButtonInteraction,
@@ -15,7 +16,11 @@ export const moduleCommand = new SlashCommandBuilder()
   .setName("module")
   .setDescription("Manage Patchouli modules.")
   .addStringOption((option) =>
-    option.setName("id").setDescription("Module id. Omit to show all modules.").setRequired(false),
+    option
+      .setName("id")
+      .setDescription("Module id. Omit to show all modules.")
+      .setAutocomplete(true)
+      .setRequired(false),
   )
   .toJSON();
 
@@ -27,6 +32,7 @@ export type ModuleCommandState = {
 const customIdPrefix = "module:";
 const togglePrefix = `${customIdPrefix}toggle:`;
 const infoPrefix = `${customIdPrefix}info:`;
+const backCustomId = `${customIdPrefix}back`;
 const listView = "list";
 const infoView = "info";
 
@@ -55,6 +61,11 @@ export async function handleModuleButton(
   interaction: ButtonInteraction,
   state: ModuleCommandState,
 ): Promise<boolean> {
+  if (interaction.customId === backCustomId) {
+    await interaction.update(moduleListPayload(state.catalog));
+    return true;
+  }
+
   if (interaction.customId.startsWith(infoPrefix)) {
     const id = interaction.customId.slice(infoPrefix.length);
     const entry = findModule(state.catalog, id);
@@ -149,14 +160,19 @@ function moduleInfoPayload(entry: PluginCatalogEntry) {
       },
     );
 
-  const button = new ButtonBuilder()
+  const toggleButton = new ButtonBuilder()
     .setCustomId(toggleId(infoView, entry.manifest.id))
     .setLabel(entry.enabled ? "Disable" : "Enable")
     .setStyle(entry.enabled ? ButtonStyle.Danger : ButtonStyle.Success);
 
+  const backButton = new ButtonBuilder()
+    .setCustomId(backCustomId)
+    .setLabel("Back to list")
+    .setStyle(ButtonStyle.Secondary);
+
   return {
     embeds: [embed],
-    components: [new ActionRowBuilder<ButtonBuilder>().addComponents(button)],
+    components: [new ActionRowBuilder<ButtonBuilder>().addComponents(toggleButton, backButton)],
   };
 }
 
@@ -191,6 +207,24 @@ function moduleListRows(catalog: PluginCatalogEntry[]): ActionRowBuilder<ButtonB
         .setStyle(entry.enabled ? ButtonStyle.Danger : ButtonStyle.Success),
     ),
   );
+}
+
+export async function handleModuleAutocomplete(
+  interaction: AutocompleteInteraction,
+  state: ModuleCommandState,
+): Promise<boolean> {
+  if (interaction.commandName !== moduleCommand.name) {
+    return false;
+  }
+
+  const focused = interaction.options.getFocused();
+  const choices = state.catalog
+    .filter((entry) => entry.manifest.id.toLowerCase().includes(focused.toLowerCase()))
+    .slice(0, 25)
+    .map((entry) => ({ name: entry.manifest.id, value: entry.manifest.id }));
+
+  await interaction.respond(choices);
+  return true;
 }
 
 function findModule(catalog: PluginCatalogEntry[], id: string): PluginCatalogEntry | undefined {
