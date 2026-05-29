@@ -15,18 +15,18 @@ pub struct PluginHandlerDefinition {
 pub fn manifest_for(
     id: &'static str,
     version: &'static str,
-    triggers: &[TriggerGroup],
+    trigger: &TriggerGroup,
     subscribes: &'static [&'static str],
     capabilities: &[Capability],
 ) -> PluginManifest {
     PluginManifest {
         id: id.to_string(),
         version: version.to_string(),
-        triggers: triggers.to_vec(),
-        subscribes: merged_subscribes(triggers, subscribes),
+        trigger: trigger.clone(),
+        subscribes: merged_subscribes(trigger, subscribes),
         capabilities: capabilities.to_vec(),
         discord: DiscordManifest {
-            slash_commands: collect_slash_commands(triggers),
+            slash_commands: collect_slash_commands(trigger),
         },
     }
 }
@@ -34,22 +34,21 @@ pub fn manifest_for(
 pub fn manifest_result_for(
     id: &'static str,
     version: &'static str,
-    triggers: &[TriggerGroup],
+    trigger: &TriggerGroup,
     subscribes: &'static [&'static str],
     capabilities: &[Capability],
 ) -> ManifestResult {
     ManifestResult::Ok {
-        manifest: manifest_for(id, version, triggers, subscribes, capabilities),
+        manifest: manifest_for(id, version, trigger, subscribes, capabilities),
     }
 }
 
-fn collect_slash_commands(triggers: &[TriggerGroup]) -> Vec<SlashCommand> {
+fn collect_slash_commands(trigger: &TriggerGroup) -> Vec<SlashCommand> {
     let mut commands = Vec::new();
-    for group in triggers {
-        for source in &group.sources {
-            if let TriggerSource::DiscordSlashCommand { command_name } = source {
-                push_unique_command(&mut commands, command_name, &group.description);
-            }
+    let description = trigger.description().unwrap_or("");
+    for source in trigger.sources() {
+        if let TriggerSource::DiscordSlashCommand { command_name } = source {
+            push_unique_command(&mut commands, command_name, description);
         }
     }
     commands
@@ -64,27 +63,16 @@ fn push_unique_command(commands: &mut Vec<SlashCommand>, name: &str, description
     }
 }
 
-fn merged_subscribes(
-    triggers: &[TriggerGroup],
-    subscribes: &'static [&'static str],
-) -> Vec<String> {
-    let mut merged = Vec::new();
-
-    for event in triggers.iter().map(|g| g.event.as_str()) {
-        push_unique(&mut merged, event);
-    }
+fn merged_subscribes(trigger: &TriggerGroup, subscribes: &'static [&'static str]) -> Vec<String> {
+    let mut merged: Vec<String> = trigger.event().into_iter().map(String::from).collect();
 
     for subscribe in subscribes {
-        push_unique(&mut merged, subscribe);
+        if !merged.iter().any(|existing| existing == *subscribe) {
+            merged.push(subscribe.to_string());
+        }
     }
 
     merged
-}
-
-fn push_unique(values: &mut Vec<String>, value: &str) {
-    if !values.iter().any(|existing| existing == value) {
-        values.push(value.to_string());
-    }
 }
 
 pub fn plan_for(input: &[u8], handlers: &'static [PluginHandlerDefinition]) -> PlanResult {

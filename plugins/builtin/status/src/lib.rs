@@ -12,9 +12,7 @@ const DISCRIPTION: &str = "Show Patchouli runtime status.";
 export_plugin! {
     id: PLUGIN_ID,
     version: PLUGIN_VERSION,
-    triggers: [
-        TriggerGroup::register(TRIGGER).slash(NAME, DISCRIPTION),
-    ],
+    trigger: TriggerGroup::register(TRIGGER).slash(NAME, DISCRIPTION),
     subscribes: [],
     capabilities: [Capability::DiscordInteractionReply],
     handlers: [

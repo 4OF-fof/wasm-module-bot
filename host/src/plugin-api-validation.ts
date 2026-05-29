@@ -60,7 +60,7 @@ function isPluginManifest(value: unknown): value is PluginManifest {
     isRecord(value) &&
     isString(value.id) &&
     isString(value.version) &&
-    isArrayOf(value.triggers, isTriggerGroup) &&
+    isTriggerGroup(value.trigger) &&
     isArrayOf(value.subscribes, isString) &&
     isArrayOf(value.capabilities, isCapability) &&
     isDiscordManifest(value.discord)
@@ -102,8 +102,10 @@ function isPluginError(value: unknown): value is PluginError {
 }
 
 function isTriggerGroup(value: unknown): value is TriggerGroup {
+  if (!isRecord(value) || !isString(value.type)) return false;
+  if (value.type === "none") return true;
   return (
-    isRecord(value) &&
+    value.type === "triggerGroup" &&
     isString(value.event) &&
     isString(value.name) &&
     isString(value.description) &&

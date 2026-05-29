@@ -22,7 +22,7 @@ macro_rules! export_plugin {
     (
         id: $id:expr,
         version: $version:expr,
-        triggers: [$($trigger:expr),* $(,)?],
+        trigger: $trigger:expr,
         subscribes: [$($subscribe:expr),* $(,)?],
         capabilities: [$($capability:expr),* $(,)?],
 
@@ -60,7 +60,7 @@ macro_rules! export_plugin {
             $crate::return_value(&$crate::manifest_result_for(
                 $id,
                 $version,
-                &[$($trigger),*],
+                &$trigger,
                 PATCHOULI_SUBSCRIBES,
                 &[$($capability),*],
             ))

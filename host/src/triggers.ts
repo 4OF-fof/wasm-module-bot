@@ -5,32 +5,24 @@ export type MatchedTrigger = {
 };
 
 export function findSlashCommandTrigger(
-  triggers: TriggerGroup[],
+  trigger: TriggerGroup,
   commandName: string,
 ): MatchedTrigger | undefined {
-  return findTrigger(triggers, (group) =>
-    group.sources.some(
-      (source) => source.type === "discordSlashCommand" && source.commandName === commandName,
-    ),
+  if (trigger.type === "none") return undefined;
+  const matched = trigger.sources.some(
+    (source) => source.type === "discordSlashCommand" && source.commandName === commandName,
   );
+  return matched ? { event: trigger.event } : undefined;
 }
 
 export function findMessageTrigger(
-  triggers: TriggerGroup[],
+  trigger: TriggerGroup,
   content: string,
 ): MatchedTrigger | undefined {
+  if (trigger.type === "none") return undefined;
   const normalizedContent = content.trim();
-  return findTrigger(triggers, (group) =>
-    group.sources.some(
-      (source) => source.type === "discordMessage" && source.content === normalizedContent,
-    ),
+  const matched = trigger.sources.some(
+    (source) => source.type === "discordMessage" && source.content === normalizedContent,
   );
-}
-
-function findTrigger(
-  triggers: TriggerGroup[],
-  matchesGroup: (group: TriggerGroup) => boolean,
-): MatchedTrigger | undefined {
-  const group = triggers.find(matchesGroup);
-  return group ? { event: group.event } : undefined;
+  return matched ? { event: trigger.event } : undefined;
 }

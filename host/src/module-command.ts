@@ -130,7 +130,9 @@ function setCatalogEnabled(
 function moduleInfoPayload(entry: PluginCatalogEntry) {
   const embed = new EmbedBuilder()
     .setTitle(entry.manifest.id)
-    .setDescription(entry.manifest.triggers.map((trigger) => trigger.description).join("\n"))
+    .setDescription(
+      entry.manifest.trigger.type === "none" ? "" : entry.manifest.trigger.description,
+    )
     .addFields(
       { name: "Version", value: entry.manifest.version, inline: true },
       { name: "Status", value: entry.enabled ? "Enabled" : "Disabled", inline: true },
@@ -209,9 +211,9 @@ function capabilityList(entry: PluginCatalogEntry): string {
 }
 
 function moduleSummary(entry: PluginCatalogEntry): string {
-  const descriptions = entry.manifest.triggers
-    .map((trigger) => trigger.description)
-    .filter((description) => description.length > 0);
+  const description =
+    entry.manifest.trigger.type === "none" ? "" : entry.manifest.trigger.description;
+  const descriptions = description.length > 0 ? [description] : [];
 
   return descriptions.length > 0 ? descriptions.join("\n") : "No description.";
 }

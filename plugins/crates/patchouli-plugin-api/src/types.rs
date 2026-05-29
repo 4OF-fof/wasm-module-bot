@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 pub struct PluginManifest {
     pub id: String,
     pub version: String,
-    pub triggers: Vec<TriggerGroup>,
+    pub trigger: TriggerGroup,
     pub subscribes: Vec<String>,
     pub capabilities: Vec<Capability>,
     pub discord: DiscordManifest,
@@ -48,17 +48,22 @@ impl PluginError {
 
 #[derive(Clone, Serialize)]
 #[cfg_attr(feature = "ts-export", derive(ts_rs::TS))]
-#[serde(rename_all = "camelCase")]
-pub struct TriggerGroup {
-    pub event: String,
-    pub name: String,
-    pub description: String,
-    pub sources: Vec<TriggerSource>,
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum TriggerGroup {
+    #[serde(rename = "triggerGroup")]
+    Group {
+        event: String,
+        name: String,
+        description: String,
+        sources: Vec<TriggerSource>,
+    },
+    #[serde(rename = "none")]
+    None,
 }
 
 impl TriggerGroup {
     pub fn register(event: impl Into<String>) -> Self {
-        Self {
+        TriggerGroup::Group {
             event: event.into(),
             name: String::new(),
             description: String::new(),
@@ -66,20 +71,55 @@ impl TriggerGroup {
         }
     }
 
-    pub fn slash(mut self, name: impl Into<String>, description: impl Into<String>) -> Self {
-        let name = name.into();
-        self.name = name.clone();
-        self.description = description.into();
-        self.sources
-            .push(TriggerSource::DiscordSlashCommand { command_name: name });
+    pub fn slash(mut self, cmd_name: impl Into<String>, desc: impl Into<String>) -> Self {
+        if let TriggerGroup::Group {
+            ref mut name,
+            ref mut description,
+            ref mut sources,
+            ..
+        } = self
+        {
+            let cmd_name = cmd_name.into();
+            *name = cmd_name.clone();
+            *description = desc.into();
+            sources.push(TriggerSource::DiscordSlashCommand {
+                command_name: cmd_name,
+            });
+        }
         self
     }
 
     pub fn message(mut self, content: impl Into<String>) -> Self {
-        self.sources.push(TriggerSource::DiscordMessage {
-            content: content.into(),
-        });
+        if let TriggerGroup::Group {
+            ref mut sources, ..
+        } = self
+        {
+            sources.push(TriggerSource::DiscordMessage {
+                content: content.into(),
+            });
+        }
         self
+    }
+
+    pub fn event(&self) -> Option<&str> {
+        match self {
+            TriggerGroup::Group { event, .. } => Some(event),
+            TriggerGroup::None => None,
+        }
+    }
+
+    pub fn description(&self) -> Option<&str> {
+        match self {
+            TriggerGroup::Group { description, .. } => Some(description),
+            TriggerGroup::None => None,
+        }
+    }
+
+    pub fn sources(&self) -> &[TriggerSource] {
+        match self {
+            TriggerGroup::Group { sources, .. } => sources,
+            TriggerGroup::None => &[],
+        }
     }
 }
 

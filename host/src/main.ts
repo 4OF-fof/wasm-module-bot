@@ -73,7 +73,7 @@ if (!token) {
 
     for (const loadedPlugin of plugins) {
       const trigger = findSlashCommandTrigger(
-        loadedPlugin.manifest.triggers,
+        loadedPlugin.manifest.trigger,
         interaction.commandName,
       );
       if (!trigger) {
@@ -95,7 +95,7 @@ if (!token) {
     }
 
     for (const loadedPlugin of plugins) {
-      const trigger = findMessageTrigger(loadedPlugin.manifest.triggers, message.content);
+      const trigger = findMessageTrigger(loadedPlugin.manifest.trigger, message.content);
       if (!trigger) {
         continue;
       }

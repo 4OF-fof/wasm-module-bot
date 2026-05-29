@@ -15,11 +15,9 @@ const EFFECT_CHANNEL: &str = "channel:";
 export_plugin! {
     id: PLUGIN_ID,
     version: PLUGIN_VERSION,
-    triggers: [
-        TriggerGroup::register(TRIGGER)
-            .slash(NAME, DISCRIPTION)
-            .message(TRIGGER_MESSAGE),
-    ],
+    trigger: TriggerGroup::register(TRIGGER)
+        .slash(NAME, DISCRIPTION)
+        .message(TRIGGER_MESSAGE),
     subscribes: [EFFECT_RESULT],
     capabilities: [
         Capability::DiscordInteractionReply,

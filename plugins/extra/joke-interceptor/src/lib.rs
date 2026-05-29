@@ -1,17 +1,16 @@
-use patchouli_plugin_api::{export_plugin, BotEvent, Capability, EffectRequest};
+use patchouli_plugin_api::{export_plugin, BotEvent, Capability, EffectRequest, TriggerGroup};
 
 const PLUGIN_ID: &str = "extra.joke-interceptor";
 const PLUGIN_VERSION: &str = "0.1.0";
 const EFFECT_RESULT: &str = "extra.joke.effect.result";
 const EFFECT_INTERACTION: &str = "interaction:";
 const EFFECT_CHANNEL: &str = "channel:";
-const INTERCEPT_MESSAGE: &str =
-    "\u{1f3a4} マイクパフォーマンスチェック…このジョークは傍受されました！";
+const INTERCEPT_MESSAGE: &str = "このジョークは傍受されました！";
 
 export_plugin! {
     id: PLUGIN_ID,
     version: PLUGIN_VERSION,
-    triggers: [],
+    trigger: TriggerGroup::None,
     subscribes: [EFFECT_RESULT],
     capabilities: [
         Capability::MessageSend,
