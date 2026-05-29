@@ -31,13 +31,11 @@ export function authorizeEffect(manifest: PluginManifest, effect: EffectRequest)
       return;
     }
 
-    case "llm.provider": {
-      const allowed = manifest.capabilities.some(
-        (capability) => capability.type === "llm.provider",
-      );
+    case "agent": {
+      const allowed = manifest.capabilities.some((capability) => capability.type === "agent");
 
       if (!allowed) {
-        throw new Error(`Plugin ${manifest.id} is not allowed to use LLM provider`);
+        throw new Error(`Plugin ${manifest.id} is not allowed to use agent capability`);
       }
       return;
     }

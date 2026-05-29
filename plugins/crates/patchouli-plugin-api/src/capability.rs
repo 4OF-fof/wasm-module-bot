@@ -8,8 +8,8 @@ pub enum Capability {
     DiscordInteractionReply,
     #[serde(rename = "http.get", rename_all = "camelCase")]
     HttpGet { origin_policy: HttpOriginPolicy },
-    #[serde(rename = "llm.provider")]
-    LlmProvider,
+    #[serde(rename = "agent")]
+    Agent,
     #[serde(rename = "message.send")]
     MessageSend,
     // TODO: Add state.read and state.write when the host gains a state store.

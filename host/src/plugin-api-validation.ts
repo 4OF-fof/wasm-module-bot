@@ -138,7 +138,7 @@ function isCapability(value: unknown): value is Capability {
 
   switch (value.type) {
     case "discord.interaction.reply":
-    case "llm.provider":
+    case "agent":
     case "message.send":
       return true;
     case "http.get":
@@ -230,13 +230,14 @@ function normalizeEffectRequest(value: unknown): EffectRequest | undefined {
         channelId: value.channelId,
         text: value.text,
       };
-    case "llm.provider":
-      if (!isArrayOf(value.messages, isLlmMessage)) {
+    case "agent":
+      if (!isString(value.sessionId) || !isArrayOf(value.messages, isLlmMessage)) {
         return undefined;
       }
       return {
         type: value.type,
         id: value.id,
+        sessionId: value.sessionId,
         messages: value.messages,
       };
     default:

@@ -17,7 +17,7 @@ export_plugin! {
     trigger: TriggerGroup::register(TRIGGER)
         .mention(),
     subscribes: [EFFECT_RESULT_TRIGGER],
-    capabilities: [Capability::LlmProvider, Capability::MessageSend],
+    capabilities: [Capability::Agent, Capability::MessageSend],
     handlers: [
         {
             event: TRIGGER,
@@ -46,7 +46,13 @@ fn handle_agent(event: BotEvent) -> Vec<EffectRequest> {
                 )];
             }
 
+            // Generate a deterministic session ID from the channel ID.
+            // Format: p-{6-digit hex} (e.g. p-a3f2b1)
+            let session_id = channel_session_id(&channel_id);
             let effect_id = format!("chat:{}", channel_id);
+
+            // Always include the system prompt. The host uses the latest
+            // system message in the session history as the system prompt.
             let messages = vec![
                 LlmMessage {
                     role: "system".to_string(),
@@ -58,7 +64,7 @@ fn handle_agent(event: BotEvent) -> Vec<EffectRequest> {
                 },
             ];
 
-            vec![EffectRequest::llm_provider(effect_id, messages)]
+            vec![EffectRequest::agent(effect_id, session_id, messages)]
         }
         _ => Vec::new(),
     }
@@ -89,13 +95,24 @@ fn handle_llm_result(event: BotEvent) -> Vec<EffectRequest> {
             };
 
             vec![EffectRequest::message_send(
-                "llm-response",
+                "agent-response",
                 channel_id,
                 text,
             )]
         }
         _ => Vec::new(),
     }
+}
+
+/// Generates a deterministic session ID from a string key.
+/// Format: p-{6-digit hex} (e.g. p-a3f2b1)
+fn channel_session_id(key: &str) -> String {
+    let mut hash: u32 = 5381;
+    for byte in key.bytes() {
+        hash = hash.wrapping_mul(33).wrapping_add(byte as u32);
+    }
+    let hex = format!("{:06x}", hash & 0xFFFFFF);
+    format!("p-{}", hex)
 }
 
 /// Strips Discord mention patterns (<@...>) and role mention patterns (<@&...>)
@@ -106,11 +123,9 @@ fn strip_mentions(content: &str) -> String {
 
     while let Some(ch) = chars.next() {
         if ch == '<' {
-            // Check if this looks like a mention or role mention
             match chars.peek() {
                 Some(&'@') => {
-                    // Skip until we find the closing '>'
-                    chars.next(); // consume '@'
+                    chars.next();
                     while let Some(&c) = chars.peek() {
                         chars.next();
                         if c == '>' {
@@ -119,8 +134,7 @@ fn strip_mentions(content: &str) -> String {
                     }
                 }
                 Some(&'#') => {
-                    // Channel mention <#...>, skip it
-                    chars.next(); // consume '#'
+                    chars.next();
                     while let Some(&c) = chars.peek() {
                         chars.next();
                         if c == '>' {

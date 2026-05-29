@@ -217,9 +217,10 @@ pub enum EffectRequest {
         method: HttpMethod,
         url: String,
     },
-    #[serde(rename = "llm.provider", rename_all = "camelCase")]
-    LlmProvider {
+    #[serde(rename = "agent", rename_all = "camelCase")]
+    Agent {
         id: String,
+        session_id: String,
         messages: Vec<LlmMessage>,
     },
     #[serde(rename = "message.send", rename_all = "camelCase")]
@@ -236,7 +237,7 @@ impl EffectRequest {
         match self {
             Self::DiscordInteractionReply { id, .. } => id,
             Self::HttpFetch { id, .. } => id,
-            Self::LlmProvider { id, .. } => id,
+            Self::Agent { id, .. } => id,
             Self::MessageSend { id, .. } => id,
         }
     }
@@ -278,9 +279,14 @@ impl EffectRequest {
         }
     }
 
-    pub fn llm_provider(id: impl Into<String>, messages: Vec<LlmMessage>) -> Self {
-        Self::LlmProvider {
+    pub fn agent(
+        id: impl Into<String>,
+        session_id: impl Into<String>,
+        messages: Vec<LlmMessage>,
+    ) -> Self {
+        Self::Agent {
             id: id.into(),
+            session_id: session_id.into(),
             messages,
         }
     }
