@@ -6,10 +6,11 @@
   "scripts": {
     "build": "pnpm run build:api && pnpm run build:plugins && tsc -p tsconfig.json",
     "build:api": "cargo run --manifest-path ../plugins/crates/patchouli-plugin-api/Cargo.toml --features ts-export --bin export_ts",
-    "build:plugins": "cargo build --manifest-path ../plugins/builtin/status/Cargo.toml --release --target wasm32-unknown-unknown && cargo build --manifest-path ../plugins/extra/joke/Cargo.toml --release --target wasm32-unknown-unknown && cargo build --manifest-path ../plugins/extra/joke-interceptor/Cargo.toml --release --target wasm32-unknown-unknown",
+    "build:plugins": "find ../plugins -name Cargo.toml -not -path '*/crates/*' | xargs -I {} cargo build --manifest-path {} --release --target wasm32-unknown-unknown",
     "start": "node --env-file=.env dist/main.js",
-    "dev": "tsc -p tsconfig.json --watch",
-    "check": "tsc -p tsconfig.json --noEmit"
+    "dev": "pnpm run build && node --env-file=.env dist/main.js",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "cleanup": "find ../plugins -type d -name target -exec rm -rf {} + 2>/dev/null; rm -rf dist"
   },
   "dependencies": {
     "discord.js": "^14.26.4"
