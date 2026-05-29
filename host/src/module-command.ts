@@ -131,7 +131,7 @@ function moduleInfoPayload(entry: PluginCatalogEntry) {
   const embed = new EmbedBuilder()
     .setTitle(entry.manifest.id)
     .setDescription(
-      entry.manifest.trigger.type === "none" ? "" : entry.manifest.trigger.description,
+      entry.manifest.trigger.type === "none" ? null : entry.manifest.trigger.description,
     )
     .addFields(
       { name: "Version", value: entry.manifest.version, inline: true },
