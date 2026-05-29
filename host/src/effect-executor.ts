@@ -25,26 +25,30 @@ export async function executeEffects(
   effects: EffectRequest[],
 ): Promise<BotEvent[]> {
   const resultEvents: BotEvent[] = [];
-  let discordErrorSent = false;
 
   for (const effect of effects) {
+    // Separate authorization from execution so we can distinguish
+    // capability errors (host's responsibility to report) from
+    // runtime errors (plugin's responsibility to handle).
+
     try {
       authorizeEffect(manifest, effect);
+    } catch (authError) {
+      const message = authError instanceof Error ? authError.message : String(authError);
+      console.error(`[${manifest.id}] Authorization error: ${message}`);
+      await sendErrorToDiscord(target, `Plugin ${manifest.id} error: ${message}`);
+      // Don't push an error effect.result: capability errors are
+      // configuration problems the plugin cannot recover from.
+      break;
+    }
+
+    try {
       resultEvents.push(await executeEffect(effect, target, manifest.id));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+    } catch (execError) {
+      const message = execError instanceof Error ? execError.message : String(execError);
       console.error(`[${manifest.id}] Effect execution error: ${message}`);
-
-      // Send only one Discord error message per executeEffects call to avoid
-      // duplicate messages when a failing effect causes subsequent effects to fail.
-      if (!discordErrorSent) {
-        discordErrorSent = true;
-        await sendErrorToDiscord(
-          target,
-          `Plugin \`${manifest.id}\` でエラーが発生しました: ${message}`,
-        );
-      }
-
+      // Return an error effect.result so the plugin can handle the
+      // runtime failure gracefully (e.g. send a user-friendly reply).
       resultEvents.push(
         effectResultEvent(manifest.id, effect.id, {
           ok: false,
@@ -52,6 +56,7 @@ export async function executeEffects(
           body: message,
         }),
       );
+      break;
     }
   }
 
