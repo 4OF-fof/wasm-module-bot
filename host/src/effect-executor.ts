@@ -111,9 +111,9 @@ async function executeDiscordMessageSend(
   target: EffectTarget,
   pluginId: string,
 ): Promise<BotEvent> {
-  const channel = "send" in target ? target : "channel" in target ? target.channel : null;
+  const channel = await fetchEffectChannel(target, effect.channelId);
   if (!channel || !("send" in channel)) {
-    throw new Error("Message send effect requires a text channel target");
+    throw new Error(`Message send effect requires a sendable channel: ${effect.channelId}`);
   }
 
   await channel.send(effect.text);
@@ -129,9 +129,9 @@ async function executeChannelHistory(
   target: EffectTarget,
   pluginId: string,
 ): Promise<BotEvent> {
-  const channel = "send" in target ? target : "channel" in target ? target.channel : null;
+  const channel = await fetchEffectChannel(target, effect.channelId);
   if (!channel || !("messages" in channel)) {
-    throw new Error("Channel history effect requires a text channel target");
+    throw new Error(`Channel history effect requires a message channel: ${effect.channelId}`);
   }
 
   try {
@@ -200,4 +200,12 @@ function extractChannelId(target: EffectTarget): string | undefined {
     return (target as ChatInputCommandInteraction).channelId ?? undefined;
   }
   return (target as TextBasedChannel).id;
+}
+
+async function fetchEffectChannel(target: EffectTarget, channelId: string) {
+  const channel = await target.client.channels.fetch(channelId);
+  if (!channel) {
+    throw new Error(`Channel not found: ${channelId}`);
+  }
+  return channel;
 }
