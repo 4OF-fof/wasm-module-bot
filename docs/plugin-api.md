@@ -16,7 +16,7 @@ cargo run --manifest-path plugins/crates/patchouli-plugin-api/Cargo.toml --featu
 
 | field                   | 内容                                                                                     |
 | ----------------------- | ---------------------------------------------------------------------------------------- |
-| `id`                    | 一意で安定した plugin id。例: `builtin.status`, `extra.joke`。                           |
+| `id`                    | 一意で安定した plugin id。例: `builtin.agent`, `extra.joke`。                            |
 | `version`               | plugin version 文字列。                                                                  |
 | `triggers`              | plugin 処理を開始できる外部入力。                                                        |
 | `subscribes`            | 初期 trigger 後に plugin が受け取る event trigger。trigger event は自動で merge される。 |
@@ -52,8 +52,8 @@ plugin は `BotEvent` を処理します。
 | `discord.message`             | message source が一致したとき。                                               | `trigger`, `channelId`, `content`     |
 | `effect.result`               | 以前の effect が完了し、plugin が `effect.result` を subscribe しているとき。 | `trigger`, `effectId`, `result`       |
 
-`modules` には、現在有効な plugin の id と version が入ります。`builtin.status` のような plugin は、
-host へ直接問い合わせずに loaded module 一覧を表示できます。
+`modules` には、現在有効な plugin の id と version が入ります。plugin は host へ直接問い合わせずに
+loaded module 一覧を参照できます。
 
 ## effect と action plan
 

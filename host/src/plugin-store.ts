@@ -23,6 +23,10 @@ export class PluginStore {
   }
 
   ensurePluginSetting(pluginId: string, origin: PluginOrigin): PluginSetting {
+    if (origin === "builtin") {
+      return { pluginId, enabled: true };
+    }
+
     const existing = this.findPluginSetting(pluginId);
     if (existing) {
       return existing;

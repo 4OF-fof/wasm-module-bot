@@ -28,8 +28,9 @@ Discord event
 
 組み込み plugin は `plugins/builtin` にあります。
 
-- `status`: `/status` で Patchouli の稼働状況とロード済み module 一覧を embed で返します。
-- `joke`: `/joke` または `!joke` で `https://api.chucknorris.io/jokes/random` からランダムな joke を取得して返します。
+- `agent`: bot mention で LLM agent 会話を開始します。
+- `session_control`: agent 用の session control tool を提供します。
+- `discord_history`: agent 用の Discord history tool を提供します。
 
 plugin manifest では、次の2つを分けています。
 
@@ -42,7 +43,7 @@ plugin の有効状態は SQLite に保存します。既定の保存先は `hos
 
 初回検出時の enabled policy は次の通りです。
 
-- `plugins/builtin/**`: enabled
+- `plugins/builtin/**`: enabled。builtin plugin は無効化できません。
 - `plugins/extra/**`: disabled
 - その他の `plugins/**`: disabled
 
@@ -61,7 +62,9 @@ pnpm run build
 リポジトリルートから個別 plugin を build する場合:
 
 ```sh
-cargo build --manifest-path plugins/builtin/status/Cargo.toml --release --target wasm32-unknown-unknown
+cargo build --manifest-path plugins/builtin/agent/Cargo.toml --release --target wasm32-unknown-unknown
+cargo build --manifest-path plugins/builtin/session_control/Cargo.toml --release --target wasm32-unknown-unknown
+cargo build --manifest-path plugins/builtin/discord_history/Cargo.toml --release --target wasm32-unknown-unknown
 cargo build --manifest-path plugins/extra/joke/Cargo.toml --release --target wasm32-unknown-unknown
 ```
 

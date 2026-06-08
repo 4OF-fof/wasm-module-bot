@@ -127,6 +127,12 @@ function setCatalogEnabled(
   entry: PluginCatalogEntry,
   enabled: boolean,
 ): void {
+  if (entry.origin === "builtin") {
+    entry.enabled = true;
+    state.refreshEnabledPlugins();
+    return;
+  }
+
   const store = new PluginStore();
   try {
     store.setPluginEnabled(entry.manifest.id, enabled);
@@ -160,19 +166,25 @@ function moduleInfoPayload(entry: PluginCatalogEntry) {
       },
     );
 
-  const toggleButton = new ButtonBuilder()
-    .setCustomId(toggleId(infoView, entry.manifest.id))
-    .setLabel(entry.enabled ? "Disable" : "Enable")
-    .setStyle(entry.enabled ? ButtonStyle.Danger : ButtonStyle.Success);
-
   const backButton = new ButtonBuilder()
     .setCustomId(backCustomId)
     .setLabel("Back to list")
     .setStyle(ButtonStyle.Secondary);
+  const row = new ActionRowBuilder<ButtonBuilder>();
+
+  if (entry.origin !== "builtin") {
+    row.addComponents(
+      new ButtonBuilder()
+        .setCustomId(toggleId(infoView, entry.manifest.id))
+        .setLabel(entry.enabled ? "Disable" : "Enable")
+        .setStyle(entry.enabled ? ButtonStyle.Danger : ButtonStyle.Success),
+    );
+  }
+  row.addComponents(backButton);
 
   return {
     embeds: [embed],
-    components: [new ActionRowBuilder<ButtonBuilder>().addComponents(toggleButton, backButton)],
+    components: [row],
   };
 }
 
@@ -196,17 +208,28 @@ function moduleListPayload(catalog: PluginCatalogEntry[]) {
 
 function moduleListRows(catalog: PluginCatalogEntry[]): ActionRowBuilder<ButtonBuilder>[] {
   return catalog.slice(0, 5).map((entry) =>
-    new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`${infoPrefix}${entry.manifest.id}`)
-        .setLabel(`${entry.manifest.id} details`)
-        .setStyle(ButtonStyle.Secondary),
+    moduleListRow(entry),
+  );
+}
+
+function moduleListRow(entry: PluginCatalogEntry): ActionRowBuilder<ButtonBuilder> {
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`${infoPrefix}${entry.manifest.id}`)
+      .setLabel(`${entry.manifest.id} details`)
+      .setStyle(ButtonStyle.Secondary),
+  );
+
+  if (entry.origin !== "builtin") {
+    row.addComponents(
       new ButtonBuilder()
         .setCustomId(toggleId(listView, entry.manifest.id))
         .setLabel(entry.enabled ? "Disable" : "Enable")
         .setStyle(entry.enabled ? ButtonStyle.Danger : ButtonStyle.Success),
-    ),
-  );
+    );
+  }
+
+  return row;
 }
 
 export async function handleModuleAutocomplete(
