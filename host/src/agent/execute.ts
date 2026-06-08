@@ -6,15 +6,35 @@ import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { effectResultEvent } from "../effect-results.js";
 import type { BotEvent, EffectRequest } from "../generated/plugin-api.js";
 import { getAgentStore } from "./store.js";
-import { createAgentTools } from "./tools.js";
+import { createAgentTools, type DiscordHistoryRange } from "./tools.js";
 
 const systemPromptPath = join(import.meta.dirname, "..", "..", "prompt", "agent_system_prompt.md");
 const agentSystemPrompt = readFileSync(systemPromptPath, "utf-8");
+
+export type DiscordHistoryMessage = {
+  offset: number;
+  id: string;
+  author: string;
+  content: string;
+  createdAt: string;
+};
+
+export type DiscordHistoryResult = {
+  type: "discord.history";
+  start: number;
+  end: number;
+  messages: DiscordHistoryMessage[];
+};
+
+export type AgentExecutionOptions = {
+  fetchDiscordHistory?(range: DiscordHistoryRange): Promise<DiscordHistoryResult>;
+};
 
 export async function executeAgent(
   effect: Extract<EffectRequest, { type: "agent" }>,
   pluginId: string,
   channelId?: string,
+  options: AgentExecutionOptions = {},
 ): Promise<BotEvent> {
   const apiKey = process.env.LLM_API_KEY;
   if (!apiKey) {
@@ -62,16 +82,21 @@ export async function executeAgent(
     }
 
     // Append incoming messages (user/assistant only — plugin no longer sends system).
-    // System prompt is always passed from the file, never mixed into session history.
+    // The core system prompt is always passed from the file, never mixed into session history.
     const store = getAgentStore();
     const newMessages = effect.messages.map((m) => ({
       role: m.role as "user" | "assistant",
       content: m.content,
     }));
+    const existingMessages = await store.getMessages(effect.sessionId);
+    const initialContext =
+      existingMessages.length === 0
+        ? await initialDiscordHistoryContext(store.initialHistoryMessages, options)
+        : [];
 
     const allMessages = await store.appendMessages(
       effect.sessionId,
-      newMessages,
+      [...initialContext, ...newMessages],
       channelId,
       pluginId,
     );
@@ -88,6 +113,7 @@ export async function executeAgent(
       onCloseSession: () => {
         shouldCloseSession = true;
       },
+      fetchDiscordHistory: options.fetchDiscordHistory,
     });
     const result = await generateText({
       model: languageModel,
@@ -131,4 +157,32 @@ export async function executeAgent(
       body: message,
     });
   }
+}
+
+async function initialDiscordHistoryContext(
+  messageCount: number,
+  options: AgentExecutionOptions,
+) {
+  if (messageCount < 1 || !options.fetchDiscordHistory) {
+    return [];
+  }
+
+  try {
+    const history = await options.fetchDiscordHistory({ start: 1, end: messageCount });
+    if (history.messages.length === 0) {
+      return [];
+    }
+    return history.messages.map((message) => ({
+      role: "user" as const,
+      content: formatInitialDiscordHistoryMessage(message),
+    }));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`Failed to fetch initial Discord history: ${message}`);
+    return [];
+  }
+}
+
+function formatInitialDiscordHistoryMessage(message: DiscordHistoryMessage): string {
+  return `[Discord history before session start] ${message.author}: ${message.content}`;
 }

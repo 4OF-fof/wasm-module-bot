@@ -17,12 +17,14 @@ interface StaleRow {
 
 const DEFAULT_MAX_MESSAGES = 500;
 const DEFAULT_SESSION_TTL_MINUTES = 60;
+const DEFAULT_INITIAL_HISTORY_MESSAGES = 20;
 
 export class AgentStore {
   private readonly database: DatabaseSync;
   private readonly summarizer: SessionSummarizer | undefined;
   private _maxMessages: number | null = null;
   private _sessionTtlMinutes: number | null = null;
+  private _initialHistoryMessages: number | null = null;
 
   constructor(path = agentDatabasePath(), summarizer?: SessionSummarizer) {
     this.summarizer = summarizer;
@@ -67,6 +69,23 @@ export class AgentStore {
       )
       .run(String(value));
     this._sessionTtlMinutes = value;
+  }
+
+  get initialHistoryMessages(): number {
+    if (this._initialHistoryMessages === null) {
+      this._initialHistoryMessages = this.loadInitialHistoryMessages();
+    }
+    return this._initialHistoryMessages;
+  }
+
+  setInitialHistoryMessages(value: number): void {
+    this.database
+      .prepare(
+        `INSERT INTO agent_settings (key, value) VALUES ('initial_history_messages', ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      )
+      .run(String(value));
+    this._initialHistoryMessages = value;
   }
 
   /**
@@ -263,6 +282,10 @@ export class AgentStore {
     return this.loadIntSetting("session_ttl_minutes", DEFAULT_SESSION_TTL_MINUTES);
   }
 
+  private loadInitialHistoryMessages(): number {
+    return this.loadIntSetting("initial_history_messages", DEFAULT_INITIAL_HISTORY_MESSAGES);
+  }
+
   private loadIntSetting(key: string, fallback: number): number {
     const row = this.database.prepare("SELECT value FROM agent_settings WHERE key = ?").get(key) as
       | { value: string }
@@ -296,7 +319,8 @@ export class AgentStore {
 
       INSERT OR IGNORE INTO agent_settings (key, value) VALUES
         ('max_messages', '${DEFAULT_MAX_MESSAGES}'),
-        ('session_ttl_minutes', '${DEFAULT_SESSION_TTL_MINUTES}');
+        ('session_ttl_minutes', '${DEFAULT_SESSION_TTL_MINUTES}'),
+        ('initial_history_messages', '${DEFAULT_INITIAL_HISTORY_MESSAGES}');
     `);
   }
 }

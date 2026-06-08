@@ -33,6 +33,11 @@ const SETTINGS = [
     label: "Session TTL (min)",
     description: "Minutes of inactivity before a session is evicted.",
   },
+  {
+    key: "initial_history_messages",
+    label: "Initial History",
+    description: "Discord history messages fetched when a new agent session starts.",
+  },
 ] as const;
 
 type SettingKey = (typeof SETTINGS)[number]["key"];
@@ -128,6 +133,8 @@ function readSetting(store: ReturnType<typeof getAgentStore>, key: SettingKey): 
       return store.maxMessages;
     case "session_ttl_minutes":
       return store.sessionTtlMinutes;
+    case "initial_history_messages":
+      return store.initialHistoryMessages;
   }
 }
 
@@ -142,6 +149,9 @@ function writeSetting(
       break;
     case "session_ttl_minutes":
       store.setSessionTtlMinutes(value);
+      break;
+    case "initial_history_messages":
+      store.setInitialHistoryMessages(value);
       break;
   }
 }

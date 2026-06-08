@@ -1,6 +1,17 @@
-import { type ChatInputCommandInteraction, MessageFlags, type TextBasedChannel } from "discord.js";
+import {
+  type ChatInputCommandInteraction,
+  MessageFlags,
+  type Message,
+  type TextBasedChannel,
+} from "discord.js";
 import { authorizeEffect } from "./authorize.js";
-import { executeAgent } from "./agent/execute.js";
+import {
+  executeAgent,
+  type AgentExecutionOptions,
+  type DiscordHistoryMessage,
+  type DiscordHistoryResult,
+} from "./agent/execute.js";
+import type { DiscordHistoryRange } from "./agent/tools.js";
 import { effectResultEvent } from "./effect-results.js";
 import type { BotEvent, EffectRequest, PluginManifest } from "./generated/plugin-api.js";
 
@@ -15,7 +26,8 @@ type EffectHandler<T extends EffectRequest> = (
 const effectHandlers = {
   "discord.interaction.reply": executeInteractionReply,
   "http.fetch": executeHttpFetch,
-  agent: (effect, target, pluginId) => executeAgent(effect, pluginId, extractChannelId(target)),
+  agent: (effect, target, pluginId) =>
+    executeAgent(effect, pluginId, extractChannelId(target), agentExecutionOptions(target)),
   "discord.message.send": executeDiscordMessageSend,
   "discord.channel.history": executeChannelHistory,
 } satisfies {
@@ -200,6 +212,80 @@ function extractChannelId(target: EffectTarget): string | undefined {
     return (target as ChatInputCommandInteraction).channelId ?? undefined;
   }
   return (target as TextBasedChannel).id;
+}
+
+function agentExecutionOptions(target: EffectTarget): AgentExecutionOptions {
+  return {
+    fetchDiscordHistory: async (range) => fetchDiscordHistory(target, range),
+  };
+}
+
+async function fetchDiscordHistory(
+  target: EffectTarget,
+  range: DiscordHistoryRange,
+): Promise<DiscordHistoryResult> {
+  const channelId = extractChannelId(target);
+  if (!channelId) {
+    throw new Error("Discord history requires a channel target");
+  }
+
+  const channel = await fetchEffectChannel(target, channelId);
+  if (!channel || !("messages" in channel)) {
+    throw new Error(`Discord history requires a message channel: ${channelId}`);
+  }
+
+  const messages = await fetchNonBotMessagesByOffset(channel, range.end);
+  const selected = messages.slice(range.start - 1, range.end);
+
+  return {
+    type: "discord.history",
+    start: range.start,
+    end: range.end,
+    messages: selected
+      .map((message, index): DiscordHistoryMessage => {
+        const offset = range.start + index;
+        return {
+          offset,
+          id: message.id,
+          author: message.author.displayName,
+          content: message.content,
+          createdAt: message.createdAt.toISOString(),
+        };
+      })
+      .reverse(),
+  };
+}
+
+async function fetchNonBotMessagesByOffset(
+  channel: Awaited<ReturnType<typeof fetchEffectChannel>>,
+  targetCount: number,
+): Promise<Message[]> {
+  if (!channel || !("messages" in channel)) {
+    return [];
+  }
+
+  const collected: Message[] = [];
+  let before: string | undefined;
+
+  while (collected.length < targetCount) {
+    const options: { limit: number; before?: string } = {
+      limit: Math.min(100, targetCount - collected.length),
+    };
+    if (before) {
+      options.before = before;
+    }
+
+    const page = await channel.messages.fetch(options);
+    if (page.size === 0) {
+      break;
+    }
+
+    const pageMessages = [...page.values()].sort((a, b) => b.createdTimestamp - a.createdTimestamp);
+    before = pageMessages[pageMessages.length - 1]?.id;
+    collected.push(...pageMessages.filter((message) => !message.author.bot));
+  }
+
+  return collected.slice(0, targetCount);
 }
 
 async function fetchEffectChannel(target: EffectTarget, channelId: string) {

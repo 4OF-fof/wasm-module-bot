@@ -80,7 +80,7 @@ EffectRequest::agent_with_tools(
     "chat",
     "session-1",
     messages,
-    ["builtin.session_control"],
+    ["builtin.discord_history"],
 )
 ```
 

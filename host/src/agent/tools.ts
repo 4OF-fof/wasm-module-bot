@@ -2,6 +2,11 @@ import { jsonSchema, tool, type ToolSet } from "ai";
 import type { LoadedPlugin } from "../plugin-registry.js";
 import type { AgentToolDefinition } from "../generated/plugin-api.js";
 
+export type DiscordHistoryRange = {
+  start: number;
+  end: number;
+};
+
 type AgentToolModule = {
   manifestId: string;
   plugin: LoadedPlugin["plugin"];
@@ -10,6 +15,7 @@ type AgentToolModule = {
 
 type AgentToolEvents = {
   onCloseSession?(): void;
+  fetchDiscordHistory?(range: DiscordHistoryRange): Promise<unknown>;
 };
 
 let agentToolModules: AgentToolModule[] = [];
@@ -74,6 +80,16 @@ export function createAgentTools(
             events.onCloseSession?.();
           }
 
+          if (definition.name === "discord_history" && isDiscordHistoryRequest(result.output)) {
+            if (!events.fetchDiscordHistory) {
+              throw new Error("discord_history is not available for this agent target");
+            }
+            return events.fetchDiscordHistory({
+              start: result.output.start,
+              end: result.output.end,
+            });
+          }
+
           return result.output;
         },
       });
@@ -81,6 +97,24 @@ export function createAgentTools(
   }
 
   return tools;
+}
+
+function isDiscordHistoryRequest(
+  output: unknown,
+): output is { type: "discord.history.request"; start: number; end: number } {
+  if (typeof output !== "object" || output === null) {
+    return false;
+  }
+  const request = output as Record<string, unknown>;
+  return (
+    request.type === "discord.history.request" &&
+    Number.isSafeInteger(request.start) &&
+    typeof request.start === "number" &&
+    request.start > 0 &&
+    Number.isSafeInteger(request.end) &&
+    typeof request.end === "number" &&
+    request.end >= request.start
+  );
 }
 
 function isCloseSessionOutput(output: unknown): boolean {
