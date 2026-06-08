@@ -8,6 +8,8 @@ export interface SessionMessage {
   content: string;
 }
 
+export const SESSION_START_SEPARATOR = "__PATCHOULI_SESSION_START__";
+
 interface StaleRow {
   session_id: string;
   messages: string;
@@ -289,7 +291,7 @@ export class AgentStore {
   }
 
   private async archiveSession(row: StaleRow): Promise<void> {
-    const messages = JSON.parse(row.messages) as SessionMessage[];
+    const messages = messagesAfterSessionStart(JSON.parse(row.messages) as SessionMessage[]);
     if (messages.length === 0) {
       return;
     }
@@ -373,6 +375,14 @@ export class AgentStore {
         ('no_reply_session_limit', '${DEFAULT_NO_REPLY_SESSION_LIMIT}');
     `);
   }
+}
+
+function messagesAfterSessionStart(messages: SessionMessage[]): SessionMessage[] {
+  const markerIndex = messages.findLastIndex(
+    (message) => message.role === "system" && message.content === SESSION_START_SEPARATOR,
+  );
+
+  return markerIndex >= 0 ? messages.slice(markerIndex + 1) : messages;
 }
 
 function agentDatabasePath(): string {

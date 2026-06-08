@@ -1,11 +1,12 @@
 import { readFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { generateText, stepCountIs, type LanguageModel } from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { effectResultEvent } from "../effect-results.js";
 import type { BotEvent, EffectRequest } from "../generated/plugin-api.js";
-import { getAgentStore } from "./store.js";
+import { getAgentStore, SESSION_START_SEPARATOR, type AgentStore } from "./store.js";
 import { createAgentTools, type DiscordHistoryRange } from "./tools.js";
 
 const systemPromptPath = join(import.meta.dirname, "..", "..", "prompt", "agent_system_prompt.md");
@@ -48,6 +49,8 @@ export async function executeAgent(
   const providerName = process.env.LLM_PROVIDER ?? "opencode";
   const providerType = process.env.LLM_PROVIDER_TYPE ?? "openai-compatible";
   const model = process.env.LLM_MODEL ?? "qwen3.6-plus";
+  const store = getAgentStore();
+  const sessionId = await resolveSessionId(store, effect.sessionId, pluginId, channelId);
 
   let baseURL: string;
   switch (providerName) {
@@ -68,7 +71,7 @@ export async function executeAgent(
       const anthropic = createAnthropic({
         baseURL,
         apiKey,
-        headers: { "x-opencode-session": effect.sessionId },
+        headers: { "x-opencode-session": sessionId },
       });
       languageModel = anthropic(model);
     } else {
@@ -76,27 +79,30 @@ export async function executeAgent(
         name: providerName,
         baseURL,
         apiKey,
-        headers: { "x-opencode-session": effect.sessionId },
+        headers: { "x-opencode-session": sessionId },
       });
       languageModel = openaiCompatible.chatModel(model);
     }
 
     // Append incoming messages (user/assistant only — plugin no longer sends system).
     // The core system prompt is always passed from the file, never mixed into session history.
-    const store = getAgentStore();
     const newMessages = effect.messages.map((m) => ({
       role: m.role as "user" | "assistant",
       content: m.content,
     }));
-    const existingMessages = await store.getMessages(effect.sessionId);
+    const existingMessages = await store.getMessages(sessionId);
     const initialContext =
       existingMessages.length === 0
         ? await initialDiscordHistoryContext(store.initialHistoryMessages, options)
         : [];
+    const sessionStart =
+      existingMessages.length === 0
+        ? [{ role: "system" as const, content: SESSION_START_SEPARATOR }]
+        : [];
 
     const allMessages = await store.appendMessages(
-      effect.sessionId,
-      [...initialContext, ...newMessages],
+      sessionId,
+      [...initialContext, ...sessionStart, ...newMessages],
       channelId,
       pluginId,
     );
@@ -140,18 +146,18 @@ export async function executeAgent(
 
     // Persist assistant response to session history.
     if (responseText) {
-      await store.appendMessages(effect.sessionId, [{ role: "assistant", content: responseText }]);
+      await store.appendMessages(sessionId, [{ role: "assistant", content: responseText }]);
     }
 
     if (shouldSkipReply) {
-      const noReplyCount = store.incrementNoReplyCount(effect.sessionId);
+      const noReplyCount = store.incrementNoReplyCount(sessionId);
       if (noReplyCount >= store.noReplySessionLimit) {
-        await store.endSession(effect.sessionId);
+        await store.endSession(sessionId);
       }
     } else if (shouldCloseSession) {
-      await store.endSession(effect.sessionId);
+      await store.endSession(sessionId);
     } else if (responseText) {
-      store.resetNoReplyCount(effect.sessionId);
+      store.resetNoReplyCount(sessionId);
     }
 
     return effectResultEvent(pluginId, effect.id, {
@@ -162,7 +168,7 @@ export async function executeAgent(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(
-      `[${pluginId}] Agent error (provider=${providerName}, model=${model}, session=${effect.sessionId}): ${message}`,
+      `[${pluginId}] Agent error (provider=${providerName}, model=${model}, session=${sessionId}): ${message}`,
     );
     return effectResultEvent(pluginId, effect.id, {
       ok: false,
@@ -170,6 +176,24 @@ export async function executeAgent(
       body: message,
     });
   }
+}
+
+async function resolveSessionId(
+  store: AgentStore,
+  fallbackSessionId: string,
+  pluginId: string,
+  channelId?: string,
+): Promise<string> {
+  if (!channelId) {
+    return fallbackSessionId;
+  }
+
+  const activeSession = await store.getActiveSessionByChannel(channelId);
+  if (activeSession?.pluginId === pluginId) {
+    return activeSession.sessionId;
+  }
+
+  return `p-${randomUUID()}`;
 }
 
 async function initialDiscordHistoryContext(
