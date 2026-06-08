@@ -80,7 +80,7 @@ EffectRequest::agent_with_tools(
     "chat",
     "session-1",
     messages,
-    ["builtin.agent-tools"],
+    ["builtin.session_control"],
 )
 ```
 

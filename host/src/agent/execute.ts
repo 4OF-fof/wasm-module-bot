@@ -83,7 +83,12 @@ export async function executeAgent(
         content: m.content,
       }));
 
-    const tools = createAgentTools(effect.toolModuleIds);
+    let shouldCloseSession = false;
+    const tools = createAgentTools(effect.toolModuleIds, {
+      onCloseSession: () => {
+        shouldCloseSession = true;
+      },
+    });
     const result = await generateText({
       model: languageModel,
       system: agentSystemPrompt,
@@ -95,13 +100,25 @@ export async function executeAgent(
       },
     });
 
+    const responseText =
+      result.text ||
+      (shouldCloseSession
+        ? "会話を終了しました。また必要なときはメンションで呼びかけてください。"
+        : "");
+
     // Persist assistant response to session history.
-    await store.appendMessages(effect.sessionId, [{ role: "assistant", content: result.text }]);
+    if (responseText) {
+      await store.appendMessages(effect.sessionId, [{ role: "assistant", content: responseText }]);
+    }
+
+    if (shouldCloseSession) {
+      await store.endSession(effect.sessionId);
+    }
 
     return effectResultEvent(pluginId, effect.id, {
       ok: true,
       status: 200,
-      body: result.text,
+      body: responseText,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

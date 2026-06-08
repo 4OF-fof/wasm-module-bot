@@ -8,6 +8,10 @@ type AgentToolModule = {
   definitions: AgentToolDefinition[];
 };
 
+type AgentToolEvents = {
+  onCloseSession?(): void;
+};
+
 let agentToolModules: AgentToolModule[] = [];
 
 export function setAgentToolModules(plugins: LoadedPlugin[]): void {
@@ -26,7 +30,10 @@ export function setAgentToolModules(plugins: LoadedPlugin[]): void {
   });
 }
 
-export function createAgentTools(moduleIds?: string[]): ToolSet | undefined {
+export function createAgentTools(
+  moduleIds?: string[],
+  events: AgentToolEvents = {},
+): ToolSet | undefined {
   const selectedModules =
     moduleIds === undefined
       ? agentToolModules
@@ -63,6 +70,10 @@ export function createAgentTools(moduleIds?: string[]): ToolSet | undefined {
             throw new Error(`${result.error.code}: ${result.error.message}`);
           }
 
+          if (definition.name === "close_session" && isCloseSessionOutput(result.output)) {
+            events.onCloseSession?.();
+          }
+
           return result.output;
         },
       });
@@ -70,4 +81,15 @@ export function createAgentTools(moduleIds?: string[]): ToolSet | undefined {
   }
 
   return tools;
+}
+
+function isCloseSessionOutput(output: unknown): boolean {
+  return (
+    typeof output === "object" &&
+    output !== null &&
+    "type" in output &&
+    output.type === "session.close" &&
+    "status" in output &&
+    output.status === "closing"
+  );
 }

@@ -131,19 +131,6 @@ if (!token) {
           plugin.manifest.trigger.type === "triggerGroup"
             ? plugin.manifest.trigger.event
             : "discord.message";
-        // If the user explicitly asks to end, let the plugin say goodbye,
-        // then immediately archive and delete the session.
-        if (isEndCommand(message.content)) {
-          await runPluginLoop(plugin, message.channel, {
-            type: "discord.message",
-            trigger: triggerEvent,
-            channelId: message.channelId,
-            content: message.content,
-          });
-          await getAgentStore().endSession(activeSession.sessionId);
-          return;
-        }
-
         void runPluginLoop(plugin, message.channel, {
           type: "discord.message",
           trigger: triggerEvent,
@@ -313,17 +300,4 @@ function configuredGuildId(): string | undefined {
     );
   }
   return value;
-}
-
-function isEndCommand(content: string): boolean {
-  const trimmed = content.trim().toLowerCase();
-  return (
-    trimmed === "終了" ||
-    trimmed === "終わり" ||
-    trimmed === "さようなら" ||
-    trimmed === "bye" ||
-    trimmed === "end" ||
-    trimmed === "exit" ||
-    trimmed === "quit"
-  );
 }

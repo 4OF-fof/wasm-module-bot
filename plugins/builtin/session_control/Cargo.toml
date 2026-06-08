@@ -1,5 +1,5 @@
 [package]
-name = "patchouli-builtin-agent-tools"
+name = "patchouli-builtin-session-control"
 version = "0.1.0"
 edition = "2021"
 

@@ -42,15 +42,6 @@ fn handle_agent(event: BotEvent) -> Vec<EffectRequest> {
                 )];
             }
 
-            // Explicit session end: user asked to stop the conversation.
-            if is_end_command(&prompt) {
-                return vec![EffectRequest::discord_message_send(
-                    "end-session",
-                    channel_id,
-                    "会話を終了しました。また必要なときはメンションで呼びかけてください。",
-                )];
-            }
-
             // Generate a deterministic session ID from the channel ID.
             // Format: p-{6-digit hex} (e.g. p-a3f2b1)
             let session_id = channel_session_id(&channel_id);
@@ -68,18 +59,6 @@ fn handle_agent(event: BotEvent) -> Vec<EffectRequest> {
         }
         _ => Vec::new(),
     }
-}
-
-/// Returns true if the user's message is an explicit request to end the conversation.
-fn is_end_command(prompt: &str) -> bool {
-    let trimmed = prompt.trim().to_lowercase();
-    trimmed == "終了"
-        || trimmed == "終わり"
-        || trimmed == "さようなら"
-        || trimmed == "bye"
-        || trimmed == "end"
-        || trimmed == "exit"
-        || trimmed == "quit"
 }
 
 fn handle_llm_result(event: BotEvent) -> Vec<EffectRequest> {
