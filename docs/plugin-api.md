@@ -106,6 +106,7 @@ use serde_json::json;
 export_agent_tools! {
     id: "extra.agent-tools.example",
     version: "0.1.0",
+    capabilities: [],
     definitions: definitions,
     execute: execute,
 }

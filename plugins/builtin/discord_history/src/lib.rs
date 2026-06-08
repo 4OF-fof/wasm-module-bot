@@ -1,5 +1,6 @@
 use patchouli_plugin_api::{
-    export_agent_tools, AgentToolCall, AgentToolDefinition, AgentToolResult, PluginError,
+    export_agent_tools, AgentToolCall, AgentToolDefinition, AgentToolResult, Capability,
+    PluginError,
 };
 use serde_json::{json, Value};
 
@@ -9,6 +10,7 @@ const PLUGIN_VERSION: &str = "0.1.0";
 export_agent_tools! {
     id: PLUGIN_ID,
     version: PLUGIN_VERSION,
+    capabilities: [Capability::DiscordChannelHistory],
     definitions: discord_history_tool_definitions,
     execute: execute_agent_tool,
 }

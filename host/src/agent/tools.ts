@@ -1,6 +1,7 @@
 import { jsonSchema, tool, type ToolSet } from "ai";
+import { authorizeEffect } from "../authorize.js";
 import type { LoadedPlugin } from "../plugin-registry.js";
-import type { AgentToolDefinition } from "../generated/plugin-api.js";
+import type { AgentToolDefinition, PluginManifest } from "../generated/plugin-api.js";
 
 export type DiscordHistoryRange = {
   start: number;
@@ -10,6 +11,7 @@ export type DiscordHistoryRange = {
 type AgentToolModule = {
   manifestId: string;
   plugin: LoadedPlugin["plugin"];
+  manifest: PluginManifest;
   definitions: AgentToolDefinition[];
 };
 
@@ -31,6 +33,7 @@ export function setAgentToolModules(plugins: LoadedPlugin[]): void {
       {
         manifestId: loadedPlugin.manifest.id,
         plugin: loadedPlugin.plugin,
+        manifest: loadedPlugin.manifest,
         definitions: loadedPlugin.plugin.getAgentToolDefinitions(),
       },
     ];
@@ -89,6 +92,13 @@ export function createAgentTools(
             if (!events.fetchDiscordHistory) {
               throw new Error("discord_history is not available for this agent target");
             }
+            authorizeEffect(module.manifest, {
+              type: "discord.channel.history",
+              id: `agent-tool:${definition.name}`,
+              channelId: "__agent_current_channel__",
+              before: null,
+              limit: result.output.end,
+            });
             return events.fetchDiscordHistory({
               start: result.output.start,
               end: result.output.end,

@@ -81,6 +81,7 @@ macro_rules! export_agent_tools {
     (
         id: $id:expr,
         version: $version:expr,
+        capabilities: [$($capability:expr),* $(,)?],
         definitions: $definitions:path,
         execute: $execute:path $(,)?
     ) => {
@@ -101,7 +102,7 @@ macro_rules! export_agent_tools {
                 $version,
                 &$crate::TriggerGroup::None,
                 &[],
-                &[],
+                &[$($capability),*],
             ))
         }
 
@@ -115,6 +116,21 @@ macro_rules! export_agent_tools {
         }
 
         $crate::export_agent_tools! {
+            definitions: $definitions,
+            execute: $execute,
+        }
+    };
+
+    (
+        id: $id:expr,
+        version: $version:expr,
+        definitions: $definitions:path,
+        execute: $execute:path $(,)?
+    ) => {
+        $crate::export_agent_tools! {
+            id: $id,
+            version: $version,
+            capabilities: [],
             definitions: $definitions,
             execute: $execute,
         }
