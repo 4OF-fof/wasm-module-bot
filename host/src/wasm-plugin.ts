@@ -1,10 +1,18 @@
 import { readFile } from "node:fs/promises";
 import type {
+  AgentToolCall,
+  AgentToolDefinition,
+  AgentToolResult,
   BotEvent,
   PluginManifest,
 } from "./generated/plugin-api.js";
 import type { ActionPlan } from "./generated/plugin-api.js";
-import { parseManifestResult, parsePlanResult } from "./plugin-api-validation.js";
+import {
+  parseAgentToolDefinitionsResult,
+  parseAgentToolResult,
+  parseManifestResult,
+  parsePlanResult,
+} from "./plugin-api-validation.js";
 
 type WasmExports = {
   memory: WebAssembly.Memory;
@@ -12,6 +20,8 @@ type WasmExports = {
   dealloc(ptr: number, len: number): void;
   manifest(): bigint;
   plan(ptr: number, len: number): bigint;
+  tool_definitions?: () => bigint;
+  execute_tool?: (ptr: number, len: number) => bigint;
 };
 
 const decoder = new TextDecoder();
@@ -41,6 +51,38 @@ export class WasmPlugin {
 
     try {
       return parsePlanResult(this.readReturnedJson(this.exports.plan(ptr, input.length)));
+    } finally {
+      this.exports.dealloc(ptr, input.length);
+    }
+  }
+
+  hasAgentTools(): boolean {
+    return (
+      typeof this.exports.tool_definitions === "function" &&
+      typeof this.exports.execute_tool === "function"
+    );
+  }
+
+  getAgentToolDefinitions(): AgentToolDefinition[] {
+    if (!this.exports.tool_definitions) {
+      return [];
+    }
+    return parseAgentToolDefinitionsResult(this.readReturnedJson(this.exports.tool_definitions()));
+  }
+
+  executeAgentTool(call: AgentToolCall): AgentToolResult {
+    if (!this.exports.execute_tool) {
+      throw new Error("WASM module does not export execute_tool");
+    }
+
+    const input = encoder.encode(JSON.stringify(call));
+    const ptr = this.exports.alloc(input.length);
+    new Uint8Array(this.exports.memory.buffer, ptr, input.length).set(input);
+
+    try {
+      return parseAgentToolResult(
+        this.readReturnedJson(this.exports.execute_tool(ptr, input.length)),
+      );
     } finally {
       this.exports.dealloc(ptr, input.length);
     }

@@ -1,5 +1,8 @@
 import type {
   ActionPlan,
+  AgentToolDefinition,
+  AgentToolDefinitionsResult,
+  AgentToolResult,
   Capability,
   DiscordEmbed,
   DiscordEmbedField,
@@ -39,6 +42,26 @@ export function parsePlanResult(value: unknown): ActionPlan {
   }
 
   return parseActionPlan(value.plan);
+}
+
+export function parseAgentToolDefinitionsResult(value: unknown): AgentToolDefinition[] {
+  if (!isAgentToolDefinitionsResult(value)) {
+    throw new Error("WASM plugin returned an invalid agent tool definitions result");
+  }
+
+  if (value.status === "err") {
+    throw new Error(`WASM agent tool definitions failed: ${value.error.code}: ${value.error.message}`);
+  }
+
+  return value.tools;
+}
+
+export function parseAgentToolResult(value: unknown): AgentToolResult {
+  if (!isAgentToolResult(value)) {
+    throw new Error("WASM plugin returned an invalid agent tool result");
+  }
+
+  return value;
 }
 
 export function parsePluginManifest(value: unknown): PluginManifest {
@@ -91,6 +114,36 @@ function isPlanResult(value: unknown): value is PlanResult {
   switch (value.status) {
     case "ok":
       return normalizeActionPlan(value.plan) !== undefined;
+    case "err":
+      return isPluginError(value.error);
+    default:
+      return false;
+  }
+}
+
+function isAgentToolDefinitionsResult(value: unknown): value is AgentToolDefinitionsResult {
+  if (!isRecord(value) || !isString(value.status)) {
+    return false;
+  }
+
+  switch (value.status) {
+    case "ok":
+      return isArrayOf(value.tools, isAgentToolDefinition);
+    case "err":
+      return isPluginError(value.error);
+    default:
+      return false;
+  }
+}
+
+function isAgentToolResult(value: unknown): value is AgentToolResult {
+  if (!isRecord(value) || !isString(value.status)) {
+    return false;
+  }
+
+  switch (value.status) {
+    case "ok":
+      return "output" in value;
     case "err":
       return isPluginError(value.error);
     default:
@@ -251,10 +304,24 @@ function normalizeEffectRequest(value: unknown): EffectRequest | undefined {
         id: value.id,
         sessionId: value.sessionId,
         messages: value.messages,
+        toolModuleIds: isArrayOf(value.toolModuleIds, isString) ? value.toolModuleIds : undefined,
       };
     default:
       return undefined;
   }
+}
+
+function isAgentToolDefinition(value: unknown): value is AgentToolDefinition {
+  return (
+    isRecord(value) &&
+    isString(value.name) &&
+    isString(value.description) &&
+    isJsonObject(value.inputSchema)
+  );
+}
+
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return isRecord(value) && !Array.isArray(value);
 }
 
 function isDiscordEmbed(value: unknown): value is DiscordEmbed {

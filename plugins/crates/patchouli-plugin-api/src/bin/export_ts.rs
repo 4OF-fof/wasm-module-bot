@@ -1,10 +1,10 @@
 use std::{fs, path::PathBuf};
 
 use patchouli_plugin_api::{
-    ActionPlan, BotEvent, Capability, DiscordEmbed, DiscordEmbedField, DiscordManifest,
-    EffectRequest, EffectResult, HttpMethod, HttpOriginPolicy, LlmMessage, ManifestResult,
-    PlanResult, PluginError, PluginManifest, PluginModuleInfo, SlashCommand, TriggerGroup,
-    TriggerSource,
+    ActionPlan, AgentToolCall, AgentToolDefinition, AgentToolDefinitionsResult, AgentToolResult,
+    BotEvent, Capability, DiscordEmbed, DiscordEmbedField, DiscordManifest, EffectRequest,
+    EffectResult, HttpMethod, HttpOriginPolicy, LlmMessage, ManifestResult, PlanResult,
+    PluginError, PluginManifest, PluginModuleInfo, SlashCommand, TriggerGroup, TriggerSource,
 };
 use ts_rs::{Config, TS};
 
@@ -16,6 +16,8 @@ fn main() {
         declaration::<PluginManifest>(),
         declaration::<ManifestResult>(),
         declaration::<PlanResult>(),
+        declaration::<AgentToolDefinitionsResult>(),
+        declaration::<AgentToolResult>(),
         declaration::<PluginError>(),
         declaration::<TriggerGroup>(),
         declaration::<TriggerSource>(),
@@ -25,6 +27,8 @@ fn main() {
         declaration::<DiscordManifest>(),
         declaration::<SlashCommand>(),
         declaration::<PluginModuleInfo>(),
+        declaration::<AgentToolDefinition>(),
+        declaration::<AgentToolCall>(),
         declaration::<BotEvent>(),
         declaration::<ActionPlan>(),
         declaration::<EffectRequest>(),

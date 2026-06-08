@@ -6,6 +6,10 @@ export type ManifestResult = { "status": "ok", manifest: PluginManifest, } | { "
 
 export type PlanResult = { "status": "ok", plan: ActionPlan, } | { "status": "err", error: PluginError, };
 
+export type AgentToolDefinitionsResult = { "status": "ok", tools: Array<AgentToolDefinition>, } | { "status": "err", error: PluginError, };
+
+export type AgentToolResult = { "status": "ok", output: unknown, } | { "status": "err", error: PluginError, };
+
 export type PluginError = { code: string, message: string, };
 
 export type TriggerGroup = { "type": "triggerGroup", event: string, name: string, description: string, sources: Array<TriggerSource>, } | { "type": "none" };
@@ -24,11 +28,15 @@ export type SlashCommand = { name: string, description: string, };
 
 export type PluginModuleInfo = { id: string, version: string, };
 
+export type AgentToolDefinition = { name: string, description: string, inputSchema: Record<string, unknown>, };
+
+export type AgentToolCall = { name: string, input: unknown, };
+
 export type BotEvent = { "type": "discord.interaction.command", trigger: string, interactionId: string, modules: Array<PluginModuleInfo>, } | { "type": "discord.message", trigger: string, channelId: string, content: string, } | { "type": "effect.result", trigger: string, effectId: string, result: EffectResult, };
 
 export type ActionPlan = { effects: Array<EffectRequest>, };
 
-export type EffectRequest = { "type": "discord.interaction.reply", id: string, interactionId: string, content: string | null, embeds: Array<DiscordEmbed>, ephemeral: boolean, } | { "type": "http.fetch", id: string, method: HttpMethod, url: string, } | { "type": "agent", id: string, sessionId: string, messages: Array<LlmMessage>, } | { "type": "discord.message.send", id: string, channelId: string, text: string, } | { "type": "discord.channel.history", id: string, channelId: string, before: string | null, limit: number, };
+export type EffectRequest = { "type": "discord.interaction.reply", id: string, interactionId: string, content: string | null, embeds: Array<DiscordEmbed>, ephemeral: boolean, } | { "type": "http.fetch", id: string, method: HttpMethod, url: string, } | { "type": "agent", id: string, sessionId: string, messages: Array<LlmMessage>, toolModuleIds?: Array<string>, } | { "type": "discord.message.send", id: string, channelId: string, text: string, } | { "type": "discord.channel.history", id: string, channelId: string, before: string | null, limit: number, };
 
 export type DiscordEmbed = { title: string, description: string, fields: Array<DiscordEmbedField>, };
 

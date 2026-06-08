@@ -1,11 +1,14 @@
 use crate::capability::Capability;
-use crate::codec::decode_event;
+use crate::codec::{decode_event, decode_tool_call};
 use crate::types::{
-    ActionPlan, BotEvent, DiscordManifest, EffectRequest, ManifestResult, PlanResult, PluginError,
+    ActionPlan, AgentToolCall, AgentToolDefinition, AgentToolDefinitionsResult, AgentToolResult,
+    BotEvent, DiscordManifest, EffectRequest, ManifestResult, PlanResult, PluginError,
     PluginManifest, SlashCommand, TriggerGroup, TriggerSource,
 };
 
 pub type PluginEventHandler = fn(BotEvent) -> Vec<EffectRequest>;
+pub type AgentToolDefinitionProvider = fn() -> Vec<AgentToolDefinition>;
+pub type AgentToolHandler = fn(AgentToolCall) -> AgentToolResult;
 
 pub struct PluginHandlerDefinition {
     pub event: &'static str,
@@ -108,6 +111,30 @@ pub fn plan_for(input: &[u8], handlers: &'static [PluginHandlerDefinition]) -> P
             effects: (handler.handle)(event),
         },
     }
+}
+
+pub fn agent_tool_definitions_result_for(
+    definitions: AgentToolDefinitionProvider,
+) -> AgentToolDefinitionsResult {
+    AgentToolDefinitionsResult::Ok {
+        tools: definitions(),
+    }
+}
+
+pub fn agent_tool_result_for(input: &[u8], execute: AgentToolHandler) -> AgentToolResult {
+    let call = match decode_tool_call(input) {
+        Ok(call) => call,
+        Err(error) => {
+            return AgentToolResult::Err {
+                error: PluginError::new(
+                    "invalid_tool_call",
+                    format!("failed to decode agent tool call: {error}"),
+                ),
+            }
+        }
+    };
+
+    execute(call)
 }
 
 fn event_trigger(event: &BotEvent) -> Option<&str> {

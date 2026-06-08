@@ -72,6 +72,59 @@ host が現在実行できる effect は次の通りです。
 すべての effect には `id` が必要です。後続の `effect.result` を routing できるよう、
 用途と target を含む id にしてください。例: `fetch-joke:interaction:{interaction_id}`。
 
+`agent` effect は任意で `toolModuleIds` を指定できます。省略した場合、host は現在有効な
+agent tool module をすべて LLM に注入します。指定した場合は、その module id の tool だけを注入します。
+
+```rust
+EffectRequest::agent_with_tools(
+    "chat",
+    "session-1",
+    messages,
+    ["builtin.agent-tools"],
+)
+```
+
+## agent tool module
+
+agent の tool 定義と実行本体は、通常の plugin とは別の WASM module として提供できます。
+tool 定義だけを持つ module は `export_agent_tools!` だけで manifest と必要な WASM export を生成できます。
+通常の plugin に tool を追加したい場合は、従来通り `export_plugin!` と `export_agent_tools!` を併用できます。
+
+| WASM export          | 内容                                                                 |
+| -------------------- | -------------------------------------------------------------------- |
+| `tool_definitions()` | `AgentToolDefinition` の配列を返す。name, description, inputSchema。 |
+| `execute_tool(...)`  | `{ name, input }` を受け取り、tool の `output` または error を返す。 |
+
+最小例:
+
+```rust
+use patchouli_plugin_api::{
+    export_agent_tools, AgentToolCall, AgentToolDefinition, AgentToolResult,
+};
+use serde_json::json;
+
+export_agent_tools! {
+    id: "extra.agent-tools.example",
+    version: "0.1.0",
+    definitions: definitions,
+    execute: execute,
+}
+
+fn definitions() -> Vec<AgentToolDefinition> {
+    vec![AgentToolDefinition {
+        name: "ping".to_string(),
+        description: "Return pong.".to_string(),
+        input_schema: json!({ "type": "object", "properties": {} }),
+    }]
+}
+
+fn execute(call: AgentToolCall) -> AgentToolResult {
+    AgentToolResult::Ok {
+        output: json!({ "message": format!("{}: pong", call.name) }),
+    }
+}
+```
+
 ## capability 一覧
 
 capability は manifest の `capabilities` に宣言し、host が effect 実行前に検査します。

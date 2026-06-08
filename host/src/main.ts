@@ -1,6 +1,7 @@
 import { Client, Events, GatewayIntentBits, Routes } from "discord.js";
 import { getAgentStore, initAgentStore } from "./agent/store.js";
 import { createSessionSummarizer } from "./agent/summarizer.js";
+import { setAgentToolModules } from "./agent/tools.js";
 import { executeEffects, sendErrorToDiscord, type EffectTarget } from "./effect-executor.js";
 import type { BotEvent } from "./generated/plugin-api.js";
 import { configCommand, handleConfigAutocomplete, handleConfigCommand } from "./config-command.js";
@@ -23,6 +24,7 @@ const token = process.env.DISCORD_TOKEN;
 const guildId = configuredGuildId();
 const pluginCatalog = await loadPluginCatalog();
 let plugins = enabledPlugins(pluginCatalog);
+setAgentToolModules(plugins);
 let discordClient: Client<true> | undefined;
 const moduleCommandState = {
   catalog: pluginCatalog,
@@ -290,6 +292,7 @@ async function registerSlashCommands(client: Client<true>): Promise<void> {
 
 function refreshEnabledPlugins(): void {
   plugins = enabledPlugins(pluginCatalog);
+  setAgentToolModules(plugins);
 }
 
 async function registerSlashCommandsIfReady(): Promise<void> {

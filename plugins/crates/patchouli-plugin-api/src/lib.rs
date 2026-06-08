@@ -5,14 +5,16 @@ pub mod types;
 mod wasm_abi;
 
 pub use capability::{Capability, HttpMethod, HttpOriginPolicy};
-pub use serde::Serialize;
+pub use serde::{Deserialize, Serialize};
 pub use slash::{
-    manifest_for, manifest_result_for, plan_for, PluginEventHandler, PluginHandlerDefinition,
+    agent_tool_definitions_result_for, agent_tool_result_for, manifest_for, manifest_result_for,
+    plan_for, PluginEventHandler, PluginHandlerDefinition,
 };
 pub use types::{
-    ActionPlan, BotEvent, DiscordEmbed, DiscordEmbedField, DiscordManifest, EffectRequest,
-    EffectResult, LlmMessage, ManifestResult, PlanResult, PluginError, PluginManifest,
-    PluginModuleInfo, SlashCommand, TriggerGroup, TriggerSource,
+    ActionPlan, AgentToolCall, AgentToolDefinition, AgentToolDefinitionsResult, AgentToolResult,
+    BotEvent, DiscordEmbed, DiscordEmbedField, DiscordManifest, EffectRequest, EffectResult,
+    LlmMessage, ManifestResult, PlanResult, PluginError, PluginManifest, PluginModuleInfo,
+    SlashCommand, TriggerGroup, TriggerSource,
 };
 #[doc(hidden)]
 pub use wasm_abi::{alloc_buffer, dealloc_buffer, return_value};
@@ -70,6 +72,67 @@ macro_rules! export_plugin {
         pub unsafe extern "C" fn plan(ptr: *const u8, len: usize) -> u64 {
             let input = std::slice::from_raw_parts(ptr, len);
             $crate::return_value(&$crate::plan_for(input, PATCHOULI_HANDLERS))
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! export_agent_tools {
+    (
+        id: $id:expr,
+        version: $version:expr,
+        definitions: $definitions:path,
+        execute: $execute:path $(,)?
+    ) => {
+        #[no_mangle]
+        pub extern "C" fn alloc(size: usize) -> *mut u8 {
+            $crate::alloc_buffer(size)
+        }
+
+        #[no_mangle]
+        pub unsafe extern "C" fn dealloc(ptr: *mut u8, len: usize) {
+            $crate::dealloc_buffer(ptr, len)
+        }
+
+        #[no_mangle]
+        pub extern "C" fn manifest() -> u64 {
+            $crate::return_value(&$crate::manifest_result_for(
+                $id,
+                $version,
+                &$crate::TriggerGroup::None,
+                &[],
+                &[],
+            ))
+        }
+
+        #[no_mangle]
+        pub unsafe extern "C" fn plan(_ptr: *const u8, _len: usize) -> u64 {
+            $crate::return_value(&$crate::PlanResult::Ok {
+                plan: $crate::ActionPlan {
+                    effects: Vec::new(),
+                },
+            })
+        }
+
+        $crate::export_agent_tools! {
+            definitions: $definitions,
+            execute: $execute,
+        }
+    };
+
+    (
+        definitions: $definitions:path,
+        execute: $execute:path $(,)?
+    ) => {
+        #[no_mangle]
+        pub unsafe extern "C" fn tool_definitions() -> u64 {
+            $crate::return_value(&$crate::agent_tool_definitions_result_for($definitions))
+        }
+
+        #[no_mangle]
+        pub unsafe extern "C" fn execute_tool(ptr: *const u8, len: usize) -> u64 {
+            let input = std::slice::from_raw_parts(ptr, len);
+            $crate::return_value(&$crate::agent_tool_result_for(input, $execute))
         }
     };
 }

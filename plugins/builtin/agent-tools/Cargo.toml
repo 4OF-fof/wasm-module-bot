@@ -1,0 +1,16 @@
+[package]
+name = "patchouli-builtin-agent-tools"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+patchouli-plugin-api = { path = "../../crates/patchouli-plugin-api" }
+serde_json = "1.0"
+
+[profile.release]
+opt-level = "s"
+strip = true
+lto = true

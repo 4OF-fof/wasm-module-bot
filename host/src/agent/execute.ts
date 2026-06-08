@@ -1,11 +1,12 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { generateText, type LanguageModel } from "ai";
+import { generateText, stepCountIs, type LanguageModel } from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { effectResultEvent } from "../effect-results.js";
 import type { BotEvent, EffectRequest } from "../generated/plugin-api.js";
 import { getAgentStore } from "./store.js";
+import { createAgentTools } from "./tools.js";
 
 const systemPromptPath = join(import.meta.dirname, "..", "..", "prompt", "agent_system_prompt.md");
 const agentSystemPrompt = readFileSync(systemPromptPath, "utf-8");
@@ -82,10 +83,13 @@ export async function executeAgent(
         content: m.content,
       }));
 
+    const tools = createAgentTools(effect.toolModuleIds);
     const result = await generateText({
       model: languageModel,
       system: agentSystemPrompt,
       messages: chatMessages,
+      tools,
+      stopWhen: tools ? stepCountIs(Number(process.env.LLM_TOOL_MAX_STEPS ?? 5)) : stepCountIs(1),
       providerOptions: {
         anthropic: { cacheControl: true },
       },

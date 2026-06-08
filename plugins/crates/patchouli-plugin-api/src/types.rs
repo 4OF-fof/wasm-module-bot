@@ -1,5 +1,6 @@
 use crate::capability::{Capability, HttpMethod};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 #[derive(Serialize)]
 #[cfg_attr(feature = "ts-export", derive(ts_rs::TS))]
@@ -27,6 +28,27 @@ pub enum ManifestResult {
 pub enum PlanResult {
     Ok { plan: ActionPlan },
     Err { error: PluginError },
+}
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "ts-export", derive(ts_rs::TS))]
+#[serde(tag = "status", rename_all = "camelCase")]
+pub enum AgentToolDefinitionsResult {
+    Ok { tools: Vec<AgentToolDefinition> },
+    Err { error: PluginError },
+}
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "ts-export", derive(ts_rs::TS))]
+#[serde(tag = "status", rename_all = "camelCase")]
+pub enum AgentToolResult {
+    Ok {
+        #[cfg_attr(feature = "ts-export", ts(type = "unknown"))]
+        output: Value,
+    },
+    Err {
+        error: PluginError,
+    },
 }
 
 #[derive(Serialize)]
@@ -167,6 +189,25 @@ pub struct PluginModuleInfo {
     pub version: String,
 }
 
+#[derive(Deserialize, Serialize)]
+#[cfg_attr(feature = "ts-export", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct AgentToolDefinition {
+    pub name: String,
+    pub description: String,
+    #[cfg_attr(feature = "ts-export", ts(type = "Record<string, unknown>"))]
+    pub input_schema: Value,
+}
+
+#[derive(Deserialize)]
+#[cfg_attr(feature = "ts-export", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct AgentToolCall {
+    pub name: String,
+    #[cfg_attr(feature = "ts-export", ts(type = "unknown"))]
+    pub input: Value,
+}
+
 #[derive(Deserialize)]
 #[cfg_attr(feature = "ts-export", derive(ts_rs::TS))]
 #[serde(tag = "type")]
@@ -222,6 +263,8 @@ pub enum EffectRequest {
         id: String,
         session_id: String,
         messages: Vec<LlmMessage>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        tool_module_ids: Vec<String>,
     },
     #[serde(rename = "discord.message.send", rename_all = "camelCase")]
     DiscordMessageSend {
@@ -293,10 +336,20 @@ impl EffectRequest {
         session_id: impl Into<String>,
         messages: Vec<LlmMessage>,
     ) -> Self {
+        Self::agent_with_tools(id, session_id, messages, Vec::<String>::new())
+    }
+
+    pub fn agent_with_tools(
+        id: impl Into<String>,
+        session_id: impl Into<String>,
+        messages: Vec<LlmMessage>,
+        tool_module_ids: impl IntoIterator<Item = impl Into<String>>,
+    ) -> Self {
         Self::Agent {
             id: id.into(),
             session_id: session_id.into(),
             messages,
+            tool_module_ids: tool_module_ids.into_iter().map(Into::into).collect(),
         }
     }
 
