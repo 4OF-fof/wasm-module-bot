@@ -15,6 +15,7 @@ type AgentToolModule = {
 
 type AgentToolEvents = {
   onCloseSession?(): void;
+  onNoReply?(): void;
   fetchDiscordHistory?(range: DiscordHistoryRange): Promise<unknown>;
 };
 
@@ -80,6 +81,10 @@ export function createAgentTools(
             events.onCloseSession?.();
           }
 
+          if (definition.name === "no_reply" && isNoReplyOutput(result.output)) {
+            events.onNoReply?.();
+          }
+
           if (definition.name === "discord_history" && isDiscordHistoryRequest(result.output)) {
             if (!events.fetchDiscordHistory) {
               throw new Error("discord_history is not available for this agent target");
@@ -114,6 +119,17 @@ function isDiscordHistoryRequest(
     Number.isSafeInteger(request.end) &&
     typeof request.end === "number" &&
     request.end >= request.start
+  );
+}
+
+function isNoReplyOutput(output: unknown): boolean {
+  return (
+    typeof output === "object" &&
+    output !== null &&
+    "type" in output &&
+    output.type === "session.no_reply" &&
+    "status" in output &&
+    output.status === "silent"
   );
 }
 

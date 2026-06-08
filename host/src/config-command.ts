@@ -38,6 +38,11 @@ const SETTINGS = [
     label: "Initial History",
     description: "Discord history messages fetched when a new agent session starts.",
   },
+  {
+    key: "no_reply_session_limit",
+    label: "No-Reply Limit",
+    description: "Consecutive no-reply decisions before the agent session is closed.",
+  },
 ] as const;
 
 type SettingKey = (typeof SETTINGS)[number]["key"];
@@ -135,6 +140,8 @@ function readSetting(store: ReturnType<typeof getAgentStore>, key: SettingKey): 
       return store.sessionTtlMinutes;
     case "initial_history_messages":
       return store.initialHistoryMessages;
+    case "no_reply_session_limit":
+      return store.noReplySessionLimit;
   }
 }
 
@@ -152,6 +159,9 @@ function writeSetting(
       break;
     case "initial_history_messages":
       store.setInitialHistoryMessages(value);
+      break;
+    case "no_reply_session_limit":
+      store.setNoReplySessionLimit(value);
       break;
   }
 }

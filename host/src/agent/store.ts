@@ -18,6 +18,7 @@ interface StaleRow {
 const DEFAULT_MAX_MESSAGES = 500;
 const DEFAULT_SESSION_TTL_MINUTES = 60;
 const DEFAULT_INITIAL_HISTORY_MESSAGES = 20;
+const DEFAULT_NO_REPLY_SESSION_LIMIT = 5;
 
 export class AgentStore {
   private readonly database: DatabaseSync;
@@ -25,6 +26,7 @@ export class AgentStore {
   private _maxMessages: number | null = null;
   private _sessionTtlMinutes: number | null = null;
   private _initialHistoryMessages: number | null = null;
+  private _noReplySessionLimit: number | null = null;
 
   constructor(path = agentDatabasePath(), summarizer?: SessionSummarizer) {
     this.summarizer = summarizer;
@@ -86,6 +88,23 @@ export class AgentStore {
       )
       .run(String(value));
     this._initialHistoryMessages = value;
+  }
+
+  get noReplySessionLimit(): number {
+    if (this._noReplySessionLimit === null) {
+      this._noReplySessionLimit = this.loadNoReplySessionLimit();
+    }
+    return this._noReplySessionLimit;
+  }
+
+  setNoReplySessionLimit(value: number): void {
+    this.database
+      .prepare(
+        `INSERT INTO agent_settings (key, value) VALUES ('no_reply_session_limit', ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      )
+      .run(String(value));
+    this._noReplySessionLimit = value;
   }
 
   /**
@@ -196,6 +215,31 @@ export class AgentStore {
     this.database.prepare("DELETE FROM agent_sessions WHERE session_id = ?").run(sessionId);
   }
 
+  incrementNoReplyCount(sessionId: string): number {
+    const row = this.database
+      .prepare(
+        `UPDATE agent_sessions
+         SET no_reply_count = no_reply_count + 1,
+             last_access_at = datetime('now')
+         WHERE session_id = ?
+         RETURNING no_reply_count`,
+      )
+      .get(sessionId) as unknown as { no_reply_count: number } | undefined;
+
+    return row?.no_reply_count ?? 0;
+  }
+
+  resetNoReplyCount(sessionId: string): void {
+    this.database
+      .prepare(
+        `UPDATE agent_sessions
+         SET no_reply_count = 0,
+             last_access_at = datetime('now')
+         WHERE session_id = ?`,
+      )
+      .run(sessionId);
+  }
+
   // ---------------------------------------------------------------------------
   // Internal helpers
   // ---------------------------------------------------------------------------
@@ -286,6 +330,10 @@ export class AgentStore {
     return this.loadIntSetting("initial_history_messages", DEFAULT_INITIAL_HISTORY_MESSAGES);
   }
 
+  private loadNoReplySessionLimit(): number {
+    return this.loadIntSetting("no_reply_session_limit", DEFAULT_NO_REPLY_SESSION_LIMIT);
+  }
+
   private loadIntSetting(key: string, fallback: number): number {
     const row = this.database.prepare("SELECT value FROM agent_settings WHERE key = ?").get(key) as
       | { value: string }
@@ -308,6 +356,7 @@ export class AgentStore {
         channel_id TEXT,
         plugin_id TEXT,
         messages TEXT NOT NULL DEFAULT '[]',
+        no_reply_count INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
         last_access_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
@@ -320,7 +369,8 @@ export class AgentStore {
       INSERT OR IGNORE INTO agent_settings (key, value) VALUES
         ('max_messages', '${DEFAULT_MAX_MESSAGES}'),
         ('session_ttl_minutes', '${DEFAULT_SESSION_TTL_MINUTES}'),
-        ('initial_history_messages', '${DEFAULT_INITIAL_HISTORY_MESSAGES}');
+        ('initial_history_messages', '${DEFAULT_INITIAL_HISTORY_MESSAGES}'),
+        ('no_reply_session_limit', '${DEFAULT_NO_REPLY_SESSION_LIMIT}');
     `);
   }
 }

@@ -79,16 +79,14 @@ fn handle_llm_result(event: BotEvent) -> Vec<EffectRequest> {
                 )];
             }
 
-            let text = if result.body.is_empty() {
-                "（応答が空でした）".to_string()
-            } else {
-                result.body
-            };
+            if result.body.is_empty() {
+                return Vec::new();
+            }
 
             vec![EffectRequest::discord_message_send(
                 "agent-response",
                 channel_id,
-                text,
+                result.body,
             )]
         }
         _ => Vec::new(),

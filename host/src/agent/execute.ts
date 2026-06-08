@@ -109,9 +109,13 @@ export async function executeAgent(
       }));
 
     let shouldCloseSession = false;
+    let shouldSkipReply = false;
     const tools = createAgentTools(effect.toolModuleIds, {
       onCloseSession: () => {
         shouldCloseSession = true;
+      },
+      onNoReply: () => {
+        shouldSkipReply = true;
       },
       fetchDiscordHistory: options.fetchDiscordHistory,
     });
@@ -127,18 +131,27 @@ export async function executeAgent(
     });
 
     const responseText =
-      result.text ||
-      (shouldCloseSession
-        ? "会話を終了しました。また必要なときはメンションで呼びかけてください。"
-        : "");
+      shouldSkipReply
+        ? ""
+        : result.text ||
+          (shouldCloseSession
+            ? "会話を終了しました。また必要なときはメンションで呼びかけてください。"
+            : "");
 
     // Persist assistant response to session history.
     if (responseText) {
       await store.appendMessages(effect.sessionId, [{ role: "assistant", content: responseText }]);
     }
 
-    if (shouldCloseSession) {
+    if (shouldSkipReply) {
+      const noReplyCount = store.incrementNoReplyCount(effect.sessionId);
+      if (noReplyCount >= store.noReplySessionLimit) {
+        await store.endSession(effect.sessionId);
+      }
+    } else if (shouldCloseSession) {
       await store.endSession(effect.sessionId);
+    } else if (responseText) {
+      store.resetNoReplyCount(effect.sessionId);
     }
 
     return effectResultEvent(pluginId, effect.id, {

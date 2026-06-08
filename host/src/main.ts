@@ -1,4 +1,4 @@
-import { Client, Events, GatewayIntentBits, Routes } from "discord.js";
+import { Client, Events, GatewayIntentBits, type Message, Routes } from "discord.js";
 import { getAgentStore, initAgentStore } from "./agent/store.js";
 import { createSessionSummarizer } from "./agent/summarizer.js";
 import { setAgentToolModules } from "./agent/tools.js";
@@ -26,6 +26,7 @@ const pluginCatalog = await loadPluginCatalog();
 let plugins = enabledPlugins(pluginCatalog);
 setAgentToolModules(plugins);
 let discordClient: Client<true> | undefined;
+const channelMessageTasks = new Map<string, Promise<void>>();
 const moduleCommandState = {
   catalog: pluginCatalog,
   refreshEnabledPlugins,
@@ -119,6 +120,15 @@ if (!token) {
       return;
     }
 
+    void enqueueChannelMessageTask(message.channelId, () =>
+      handleDiscordMessage(client, message),
+    ).catch((error) => {
+      const reason = error instanceof Error ? error.message : String(error);
+      console.error(`Message handling failed for channel ${message.channelId}: ${reason}`);
+    });
+  });
+
+  async function handleDiscordMessage(client: Client, message: Message): Promise<void> {
     if (!client.user) return;
 
     // Check for an active agent session in this channel.
@@ -131,7 +141,7 @@ if (!token) {
           plugin.manifest.trigger.type === "triggerGroup"
             ? plugin.manifest.trigger.event
             : "discord.message";
-        void runPluginLoop(plugin, message.channel, {
+        await runPluginLoop(plugin, message.channel, {
           type: "discord.message",
           trigger: triggerEvent,
           channelId: message.channelId,
@@ -148,7 +158,7 @@ if (!token) {
       if (isMentioned) {
         const mentionTrigger = findMentionTrigger(loadedPlugin.manifest.trigger);
         if (mentionTrigger) {
-          void runPluginLoop(loadedPlugin, message.channel, {
+          await runPluginLoop(loadedPlugin, message.channel, {
             type: "discord.message",
             trigger: mentionTrigger.event,
             channelId: message.channelId,
@@ -164,14 +174,14 @@ if (!token) {
         continue;
       }
 
-      void runPluginLoop(loadedPlugin, message.channel, {
+      await runPluginLoop(loadedPlugin, message.channel, {
         type: "discord.message",
         trigger: trigger.event,
         channelId: message.channelId,
         content: message.content,
       });
     }
-  });
+  }
 
   client.on(Events.Error, (error) => {
     console.error("Discord client error:", error);
@@ -250,6 +260,27 @@ async function dispatchToOtherPlugins(
       }
     }
   }
+}
+
+function enqueueChannelMessageTask(
+  channelId: string,
+  task: () => Promise<void>,
+): Promise<void> {
+  const previous = channelMessageTasks.get(channelId) ?? Promise.resolve();
+  const next = previous
+    .catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`Previous message task failed for channel ${channelId}: ${message}`);
+    })
+    .then(task);
+
+  const cleanup = next.finally(() => {
+    if (channelMessageTasks.get(channelId) === cleanup) {
+      channelMessageTasks.delete(channelId);
+    }
+  });
+  channelMessageTasks.set(channelId, cleanup);
+  return cleanup;
 }
 
 async function shutdown(client: Client, signal: string): Promise<void> {
