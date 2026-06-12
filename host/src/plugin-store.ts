@@ -83,7 +83,7 @@ export class PluginStore {
 }
 
 export function databasePathFromEnv(): string {
-  return resolve(process.env.PATCHOULI_DATA_DIR ?? "data", "patchouli.sqlite");
+  return resolve(process.env.MODULEBOT_DATA_DIR ?? "data", "modulebot.sqlite");
 }
 
 function defaultEnabledForOrigin(origin: PluginOrigin): boolean {

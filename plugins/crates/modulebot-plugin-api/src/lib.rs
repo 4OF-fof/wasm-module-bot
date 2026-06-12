@@ -37,8 +37,8 @@ macro_rules! export_plugin {
             ),* $(,)?
         ] $(,)?
     ) => {
-        static PATCHOULI_SUBSCRIBES: &[&str] = &[$($subscribe),*];
-        static PATCHOULI_HANDLERS: &[$crate::PluginHandlerDefinition] = &[
+        static MODULEBOT_SUBSCRIBES: &[&str] = &[$($subscribe),*];
+        static MODULEBOT_HANDLERS: &[$crate::PluginHandlerDefinition] = &[
             $(
                 $crate::PluginHandlerDefinition {
                     event: $event,
@@ -63,7 +63,7 @@ macro_rules! export_plugin {
                 $id,
                 $version,
                 &$trigger,
-                PATCHOULI_SUBSCRIBES,
+                MODULEBOT_SUBSCRIBES,
                 &[$($capability),*],
             ))
         }
@@ -71,7 +71,7 @@ macro_rules! export_plugin {
         #[no_mangle]
         pub unsafe extern "C" fn plan(ptr: *const u8, len: usize) -> u64 {
             let input = std::slice::from_raw_parts(ptr, len);
-            $crate::return_value(&$crate::plan_for(input, PATCHOULI_HANDLERS))
+            $crate::return_value(&$crate::plan_for(input, MODULEBOT_HANDLERS))
         }
     };
 }

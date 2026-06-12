@@ -14,7 +14,7 @@ import type { PluginCatalogEntry } from "./plugin-registry.js";
 
 export const moduleCommand = new SlashCommandBuilder()
   .setName("module")
-  .setDescription("Manage Patchouli modules.")
+  .setDescription("Manage Modulebot modules.")
   .addStringOption((option) =>
     option
       .setName("id")
@@ -190,7 +190,7 @@ function moduleInfoPayload(entry: PluginCatalogEntry) {
 
 function moduleListPayload(catalog: PluginCatalogEntry[]) {
   const embed = new EmbedBuilder()
-    .setTitle("Patchouli Modules")
+    .setTitle("Modulebot Modules")
     .setDescription(`${catalog.length} module${catalog.length === 1 ? "" : "s"} found.`)
     .addFields(
       ...catalog.map((entry) => ({

@@ -15,15 +15,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8ca58f447f06ed17d5fc4043ce1b10dd205e060fb3ce5b979b8ed8e59ff3f79"
 
 [[package]]
-name = "patchouli-builtin-joke"
+name = "modulebot-builtin-joke"
 version = "0.1.0"
 dependencies = [
- "patchouli-plugin-api",
+ "modulebot-plugin-api",
  "serde_json",
 ]
 
 [[package]]
-name = "patchouli-plugin-api"
+name = "modulebot-plugin-api"
 version = "0.1.0"
 dependencies = [
  "serde",

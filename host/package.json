@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "pnpm run build:api && pnpm run build:plugins && tsc -p tsconfig.json",
-    "build:api": "cargo run --manifest-path ../plugins/crates/patchouli-plugin-api/Cargo.toml --features ts-export --bin export_ts",
+    "build:api": "cargo run --manifest-path ../plugins/crates/modulebot-plugin-api/Cargo.toml --features ts-export --bin export_ts",
     "build:plugins": "find ../plugins -name Cargo.toml -not -path '*/crates/*' | xargs -I {} cargo build --manifest-path {} --release --target wasm32-unknown-unknown",
     "start": "node --env-file=.env dist/main.js",
     "dev": "pnpm run build && node --env-file=.env dist/main.js",

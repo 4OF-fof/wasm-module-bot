@@ -1,7 +1,7 @@
-# Patchouli plugin 開発ガイド
+# Modulebot plugin 開発ガイド
 
 この文書は新規 plugin 開発者向けの手順です。Rust で plugin を作り、
-`wasm32-unknown-unknown` target 向けに build し、`patchouli-plugin-api` crate を使う前提です。
+`wasm32-unknown-unknown` target 向けに build し、`modulebot-plugin-api` crate を使う前提です。
 
 ## 1. plugin crate を作る
 
@@ -15,7 +15,7 @@ plugin crate は `cdylib` として build します。
 crate-type = ["cdylib"]
 
 [dependencies]
-patchouli-plugin-api = { path = "../../crates/patchouli-plugin-api" }
+modulebot-plugin-api = { path = "../../crates/modulebot-plugin-api" }
 ```
 
 `plugins/builtin` / `plugins/extra` 以外に置く場合は、相対 path を調整してください。
@@ -25,7 +25,7 @@ patchouli-plugin-api = { path = "../../crates/patchouli-plugin-api" }
 `export_plugin!` macro で metadata、trigger、capability、handler を宣言します。
 
 ```rust
-use patchouli_plugin_api::{
+use modulebot_plugin_api::{
     export_plugin, BotEvent, Capability, EffectRequest, TriggerGroup,
 };
 
@@ -59,14 +59,14 @@ fn handle_hello(event: BotEvent) -> Vec<EffectRequest> {
             vec![EffectRequest::interaction_reply(
                 "reply-hello",
                 interaction_id,
-                "Hello from Patchouli.",
+                "Hello from Modulebot.",
             )]
         }
         BotEvent::DiscordMessage { channel_id, .. } => {
             vec![EffectRequest::discord_message_send(
                 "send-hello",
                 channel_id,
-                "Hello from Patchouli.",
+                "Hello from Modulebot.",
             )]
         }
         _ => Vec::new(),
@@ -167,10 +167,10 @@ pnpm start
 ```env
 DISCORD_TOKEN=your-bot-token
 DISCORD_GUILD_ID=your-guild-id
-PATCHOULI_DATA_DIR=
+MODULEBOT_DATA_DIR=
 ```
 
-Patchouli は guild slash command だけを登録します。message trigger を使う場合は、
+Modulebot は guild slash command だけを登録します。message trigger を使う場合は、
 Discord Developer Portal で Message Content Intent も有効にしてください。
 
 ## 開発時の convention

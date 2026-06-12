@@ -8,7 +8,7 @@ export interface SessionMessage {
   content: string;
 }
 
-export const SESSION_START_SEPARATOR = "__PATCHOULI_SESSION_START__";
+export const SESSION_START_SEPARATOR = "__MODULEBOT_SESSION_START__";
 
 interface StaleRow {
   session_id: string;
@@ -386,11 +386,11 @@ function messagesAfterSessionStart(messages: SessionMessage[]): SessionMessage[]
 }
 
 function agentDatabasePath(): string {
-  return resolve(process.env.PATCHOULI_DATA_DIR ?? "data", "agent.sqlite");
+  return resolve(process.env.MODULEBOT_DATA_DIR ?? "data", "agent.sqlite");
 }
 
 function memoryDirPath(): string {
-  return resolve(process.env.PATCHOULI_MEMORY_DIR ?? "memory");
+  return resolve(process.env.MODULEBOT_MEMORY_DIR ?? "memory");
 }
 
 /**

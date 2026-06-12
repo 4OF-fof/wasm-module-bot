@@ -1,4 +1,4 @@
-use patchouli_plugin_api::{export_plugin, BotEvent, Capability, EffectRequest, TriggerGroup};
+use modulebot_plugin_api::{export_plugin, BotEvent, Capability, EffectRequest, TriggerGroup};
 
 const PLUGIN_ID: &str = "extra.joke";
 const PLUGIN_VERSION: &str = "0.1.0";

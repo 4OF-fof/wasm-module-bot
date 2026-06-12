@@ -9,7 +9,7 @@ import { getAgentStore } from "./agent/store.js";
 
 export const configCommand = new SlashCommandBuilder()
   .setName("config")
-  .setDescription("Manage Patchouli agent settings.")
+  .setDescription("Manage Modulebot agent settings.")
   .addStringOption((option) =>
     option
       .setName("key")
@@ -167,7 +167,7 @@ function writeSetting(
 }
 
 function settingsListEmbed(store: ReturnType<typeof getAgentStore>): EmbedBuilder {
-  return new EmbedBuilder().setTitle("Patchouli Agent Settings").addFields(
+  return new EmbedBuilder().setTitle("Modulebot Agent Settings").addFields(
     ...SETTINGS.map((s) => ({
       name: s.label,
       value: `${s.description}\nCurrent: \`${readSetting(store, s.key)}\``,

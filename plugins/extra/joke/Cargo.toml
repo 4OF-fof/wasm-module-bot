@@ -1,5 +1,5 @@
 [package]
-name = "patchouli-builtin-joke"
+name = "modulebot-builtin-joke"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,7 +7,7 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-patchouli-plugin-api = { path = "../../crates/patchouli-plugin-api" }
+modulebot-plugin-api = { path = "../../crates/modulebot-plugin-api" }
 serde_json = "1.0"
 
 [profile.release]

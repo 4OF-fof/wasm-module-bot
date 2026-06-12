@@ -1,5 +1,5 @@
 [package]
-name = "patchouli-extra-joke-interceptor"
+name = "modulebot-extra-joke-interceptor"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,7 +7,7 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-patchouli-plugin-api = { path = "../../crates/patchouli-plugin-api" }
+modulebot-plugin-api = { path = "../../crates/modulebot-plugin-api" }
 
 [profile.release]
 opt-level = "s"

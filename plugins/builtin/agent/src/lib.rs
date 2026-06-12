@@ -1,4 +1,4 @@
-use patchouli_plugin_api::{
+use modulebot_plugin_api::{
     export_plugin, BotEvent, Capability, EffectRequest, LlmMessage, TriggerGroup,
 };
 

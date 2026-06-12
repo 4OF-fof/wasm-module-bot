@@ -36,7 +36,7 @@ const moduleCommandState = {
 const agentStore = initAgentStore(undefined, createSessionSummarizer());
 
 if (!token) {
-  console.log("Patchouli host started in dry-run mode.");
+  console.log("Modulebot host started in dry-run mode.");
   console.log("Set DISCORD_TOKEN to log in as a Discord bot.");
   console.log(`Loaded host commands: /${configCommand.name}, /${moduleCommand.name}.`);
   for (const loadedPlugin of plugins) {
@@ -59,7 +59,7 @@ if (!token) {
 
   client.once(Events.ClientReady, (readyClient) => {
     discordClient = readyClient;
-    console.log(`Patchouli host logged in as ${readyClient.user.tag}.`);
+    console.log(`Modulebot host logged in as ${readyClient.user.tag}.`);
     void registerSlashCommands(readyClient);
   });
 
@@ -284,7 +284,7 @@ function enqueueChannelMessageTask(
 }
 
 async function shutdown(client: Client, signal: string): Promise<void> {
-  console.log(`Received ${signal}. Shutting down Patchouli host.`);
+  console.log(`Received ${signal}. Shutting down Modulebot host.`);
   agentStore.close();
   client.destroy();
 }
@@ -292,7 +292,7 @@ async function shutdown(client: Client, signal: string): Promise<void> {
 async function registerSlashCommands(client: Client<true>): Promise<void> {
   if (!guildId) {
     throw new Error(
-      "DISCORD_GUILD_ID is required because Patchouli only registers guild commands.",
+      "DISCORD_GUILD_ID is required because Modulebot only registers guild commands.",
     );
   }
 
@@ -327,7 +327,7 @@ function configuredGuildId(): string | undefined {
   const value = process.env.DISCORD_GUILD_ID;
   if (!value) {
     throw new Error(
-      "DISCORD_GUILD_ID is required because Patchouli only registers guild commands.",
+      "DISCORD_GUILD_ID is required because Modulebot only registers guild commands.",
     );
   }
   return value;
